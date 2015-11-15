@@ -18,6 +18,9 @@ public final class MyStrategy implements Strategy {
     private static int ticksGetOutStuckIni=250;      //Количество тиков за которые машина пытается выбраться
     private static int ticksGetOutStuck=ticksGetOutStuckIni;      //Тиков до продолжения движения
     private static boolean carGetOutStuckOperation=false;          //Операция по вызволению машины активирована
+    private static boolean carGetOutStuckOperationForward=false;          //Операция по вызволению машины2 активирована
+
+    private static double goodWheelTurn = 0;
 
     private static final int ticksToComeBack=50;
     //Задание движения
@@ -43,7 +46,7 @@ public final class MyStrategy implements Strategy {
 
             }
 
-            isStuck(self, world, game, move);
+            isStuck(self, world, game, move, nextWaypoint[0], nextWaypoint[1]);
 
         }else{
             //Если мы застряли
@@ -92,7 +95,7 @@ public final class MyStrategy implements Strategy {
         double speedModule = hypot(self.getSpeedX(), self.getSpeedY());
 
         move.setWheelTurn(angleToWaypoint * 12.0D / PI);
-        move.setEnginePower(0.5D);
+        move.setEnginePower(0.95D);
 
         double coefBrake = 5.5D * 5.5D * PI;
         if (speedModule * speedModule * abs(angleToWaypoint) > coefBrake) {
@@ -103,7 +106,7 @@ public final class MyStrategy implements Strategy {
     }
 
     //Проверка на застревание
-    public void isStuck(Car self, World world, Game game, Move move){
+    public void isStuck(Car self, World world, Game game, Move move, double nextWaypointX, double nextWaypointY){
         //Если гонка идёт и мы целы, а координаты не меняются уже ticksStuckIni тиков
         if(isStart & self.getDurability()>0){
 
@@ -114,11 +117,10 @@ public final class MyStrategy implements Strategy {
                 ticksStuck--;//Запускаем обратный отсчёт
                 //Если количество тиков вышло - машина застряла
                 if(ticksStuck<0) {
-                    double nextWaypointX = (self.getNextWaypointX() + 0.45D) * game.getTrackTileSize();
-                    double nextWaypointY = (self.getNextWaypointY() + 0.45D) * game.getTrackTileSize();
-
                     carStuck = true;
                     ticksGetOutStuck=ticksGetOutStuckIni;
+//                    moveTo(self, world, game, move, nextWaypointX, nextWaypointY);
+                    goodWheelTurn = move.getWheelTurn();
                 }
             }else {
                 //Если машина сдвинулась с места - обновляем счётчик
@@ -130,21 +132,40 @@ public final class MyStrategy implements Strategy {
 
     //Стратегия возврата в гонку, если машина застряла
     public void getOutOfStuck(Car self, World world, Game game, Move move){
+        //Когда выбрались, но вперёд ехать надо
+        if(carGetOutStuckOperationForward){
+            if(self.getEnginePower()>0){
+                //Операция по спасению закончилась
+                carGetOutStuckOperationForward=false;
+                carGetOutStuckOperation=false;
+                carStuck = false;
+                ticksStuck=ticksStuckIni*20;//задаём задержку застревания с запасом
+                return;
+            }else if(ticksGetOutStuck<0) {
+                carGetOutStuckOperationForward=false;
+                carGetOutStuckOperation=true;
+            }else{
+                move.setWheelTurn(goodWheelTurn);
+                move.setEnginePower(0.05D);
+            }
+        }
+
+        //Когда начинаем выбираться, едем назад
         if(carGetOutStuckOperation){
             ticksGetOutStuck--;
 
             double delta = 0.1;
             if(Math.abs(self.getEnginePower())<= delta){
                 move.setEnginePower(-1.0D);//Иначе машина останется стоять
-                double nextWaypointX = (self.getNextWaypointX() + 0.45D) * game.getTrackTileSize();
-                double nextWaypointY = (self.getNextWaypointY() + 0.45D) * game.getTrackTileSize();
-                double angleToWaypoint = self.getAngleTo(nextWaypointX, nextWaypointY);
-                move.setWheelTurn(-angleToWaypoint * 12.0D / PI);
+                move.setWheelTurn(-goodWheelTurn);
             }
             if(ticksGetOutStuck<0) {
+                carGetOutStuckOperationForward=true;
+                ticksGetOutStuck=ticksGetOutStuckIni;
+                move.setEnginePower(0.05D);
                 carStuck = false;
                 carGetOutStuckOperation=false;
-                ticksStuck=ticksStuckIni*10;
+                ticksStuck=ticksStuckIni*20;
             }
         }else{
             move.setBrake(false);
