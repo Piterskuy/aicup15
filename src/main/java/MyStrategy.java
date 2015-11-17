@@ -12,30 +12,30 @@ public final class MyStrategy implements Strategy {
 
     private static boolean isStart=false;           //Гонка началась
 
-    private static final int ticksStuckIni=10;      //Количество тиков за которые если координаты не меняются - машина застряла
+    private static final int ticksStuckIni=30;      //Количество тиков за которые если координаты не меняются - машина застряла
     private static int ticksStuck=ticksStuckIni;   //Тиков до застревания
     private static boolean carStuck=false;          //Машина застряла
     private static int ticksGetOutStuckIni=80;      //Количество тиков за которые машина пытается выбраться
     private static int ticksGetOutStuck=ticksGetOutStuckIni;      //Тиков до продолжения движения
     private static boolean carGetOutStuckOperation=false;          //Операция по вызволению машины активирована
-    private static boolean carGetOutStuckOperationForward=false;          //Операция по вызволению машины2 активирована
 
     private static double maxEngineValue=1.0D;          //Максимальное значение двигателя
-
-
     private static double goodWheelTurn = 0;
 
-    private static final int ticksToComeBack=50;
+    private static boolean firstTick = true;
     //Задание движения
     @Override
     public void move(Car self, World world, Game game, Move move) {
+        if(firstTick)
+            firstCheck(world);
+
         if(!carStuck) {
             double nextWaypoint[] = new double [1];
             nextWaypoint = getDirection(self, world, game, move);
             moveTo(self, world, game, move, nextWaypoint[0], nextWaypoint[1]);
 //            move.setEnginePower(0.3D);
             //Если игра началась
-            if (world.getTick() > game.getInitialFreezeDurationTicks() + 50) {
+            if (world.getTick() > game.getInitialFreezeDurationTicks() + 10) {
 
                 if(move.getEnginePower()>0){
                     isStart=true;
@@ -107,7 +107,7 @@ public final class MyStrategy implements Strategy {
         if (self.getRemainingNitroCooldownTicks() > 0)
             maxEngineValue /= 1.3D;
 
-        System.out.println(world.getTilesXY()[self.getNextWaypointX()][self.getNextWaypointY()].toString());
+//        System.out.println(world.getTilesXY()[self.getNextWaypointX()][self.getNextWaypointY()].toString());
         return new double []{nextWaypointX,nextWaypointY};
     }
 
@@ -184,7 +184,7 @@ public final class MyStrategy implements Strategy {
         }
     }
 
-    //Действия с бонусами
+    //Оценка возможности атаки
     public void attack(Car self, World world, Game game, Move move){
         if (isStart & self.getProjectileCount() > 0 & self.getRemainingProjectileCooldownTicks()<=0) {
             Car cars[] = world.getCars();
@@ -215,6 +215,87 @@ public final class MyStrategy implements Strategy {
             }
 
         }
+    }
+
+    //Оценка возможности подбора бонусов
+//    public void checkBonuses(Car self, World world, Game game, Move move){
+//        Bonus bonuses[] = world.getBonuses();
+//        double bonusClosest[]=new double[10];
+//        int i=0;
+//
+//        BonusType neededBonus = checkNeedBonuses(self, world, game, move);
+//        boolean needBonusFound = false;
+//        Bonus getBonus;
+//        for(Bonus bonus :bonuses ){
+//            if (self.getDistanceTo(bonus.getX(),bonus.getY())<500){
+//                if (bonus.getType()==neededBonus){
+//                    if(needBonusFound){
+//                        getBonus=self.getDistanceTo(getBonus.getX(),getBonus.getY())<self.getDistanceTo(bonus.getX(),bonus.getY())
+//                    }
+//                    =
+//                }
+//            }
+//
+//            bonusClosest[i]= self.getDistanceTo(bonus.getX(),bonus.getY());
+//            i++;
+//        }
+//        Arrays.sort(bonusClosest);
+//
+//        //Если противник в пределах видимости, то атакуем
+//        if(bonusClosest[1]<1100) {
+//
+//            i = 0;
+//            for (Bonus bonus : bonuses) {
+//                double delta = 1;
+//                if (Math.abs(bonusClosest[i] - self.getDistanceTo(car.getX(), car.getY())) <= delta) {
+//                    double angleToOpponent = self.getAngleTo(car.getX(), car.getY());
+//                    delta = 0.15;
+//                    if (Math.abs(angleToOpponent) <= delta) {
+//                        move.setThrowProjectile(true);
+//
+//                    }
+//                }
+//                i++;
+//
+//            }
+//        }
+//
+//    //Оценка нужды в бонусах
+//    public BonusType checkNeedBonuses(Car self, World world, Game game, Move move){
+//            if(self.getDurability()<0.4){
+//                return BonusType.REPAIR_KIT;
+//            }else{
+//                double repairNeed = (self.getDurability()-1);
+//                double ammoNeed= 1/(self.getProjectileCount()+0.2);
+//                double nitroNeed= 1/(self.getNitroChargeCount()+0.05);
+//                double oilNeed= 1/(self.getOilCanisterCount()+0.1);
+//
+//                if(ammoNeed>nitroNeed){
+//                    if(ammoNeed>oilNeed){
+//                        if(ammoNeed>oilNeed){
+//
+//                        }else{
+//
+//                        }
+//                }
+////                        Player playersScore[] = new Player [4];
+////                for(Player player :world.getPlayers() ){
+////                    bonusClosest[i]= self.getDistanceTo(bonus.getX(),bonus.getY());
+////                    i++;
+////                }
+////                Arrays.sort(bonusClosest);getScore( )
+//        }
+//        }
+
+
+    public static void firstCheck(World world) {
+                for(int i=0; i<world.getWidth(); i++){
+                    for(int j=0; j<world.getHeight()-1; j++){
+                        System.out.print(world.getTilesXY()[i][j] + " ");
+                    }
+                    System.out.println(world.getTilesXY()[i][world.getHeight()-1]);
+                }
+        firstTick=false;
     }
 }
 //getCarWheelTurnChangePerTick - максимальное значение, на которое может измениться относительный угол поворота колёс кодемобиля (❝❛r✳✇❤❡❡❧❚✉r♥) за один тик.
