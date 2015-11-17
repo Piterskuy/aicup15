@@ -35,14 +35,14 @@ public final class MyStrategy implements Strategy {
             moveTo(self, world, game, move, nextWaypoint[0], nextWaypoint[1]);
 //            move.setEnginePower(0.3D);
             //Если игра началась
-            if (world.getTick() > game.getInitialFreezeDurationTicks() + 10) {
+            if (world.getTick() > game.getInitialFreezeDurationTicks()) {
 
-                if(move.getEnginePower()>0){
+                if(self.getEnginePower()>0){
                     isStart=true;
                 }
 
                 if (self.getNitroChargeCount() > 0 && self.getRemainingNitroCooldownTicks() == 0 && !move.isUseNitro()) {
-                    if(self.getDistanceTo(nextWaypoint[0], nextWaypoint[1])>3000){
+                    if(self.getDistanceTo(nextWaypoint[0], nextWaypoint[1])>2500){
                         move.setUseNitro(true);
                     }
                 }
@@ -168,14 +168,15 @@ public final class MyStrategy implements Strategy {
             if(ticksGetOutStuck<=0) {
                 //Уходим по таймеру в минус и ждём пока машина затормозит после заднего хода
                 move.setEnginePower(1.0D);//Едем вперёд
-                setGoodWheelTurn(self, world, game, move, getDirection(self, world, game, move));
-                move.setWheelTurn(goodWheelTurn);
 
                 if(self.getEnginePower()>0){
                     //Если машина готова к езде, выходим из операции спасения
                     carStuck = false;
                     carGetOutStuckOperation=false;
                     ticksStuck=ticksStuckIni;
+                }else if (self.getEnginePower()>-0.3D) {
+                    setGoodWheelTurn(self, world, game, move, getDirection(self, world, game, move));
+                    move.setWheelTurn(goodWheelTurn);
                 }
             }
         } else{
@@ -289,13 +290,22 @@ public final class MyStrategy implements Strategy {
 
 
     public static void firstCheck(World world) {
-                for(int i=0; i<world.getWidth(); i++){
-                    for(int j=0; j<world.getHeight()-1; j++){
-                        System.out.print(world.getTilesXY()[i][j] + " ");
-                    }
-                    System.out.println(world.getTilesXY()[i][world.getHeight()-1]);
-                }
+        System.out.println("TILES");
+        for(int j=0; j<world.getHeight(); j++){
+            for(int i=0; i<world.getWidth()-1; i++){
+                System.out.print(world.getTilesXY()[i][j] + " ");
+            }
+            System.out.println(world.getTilesXY()[world.getWidth()-1][j]);
+        }
+
+        System.out.println("WAYPOINTS");
+        for(int i=0; i<world.getWaypoints().length; i++){
+            //[0] - X, [1] - Y
+            System.out.print("X: "+ world.getWaypoints()[i][0]);
+            System.out.println(" Y: " + world.getWaypoints()[i][1]);
+        }
         firstTick=false;
+
     }
 }
 //getCarWheelTurnChangePerTick - максимальное значение, на которое может измениться относительный угол поворота колёс кодемобиля (❝❛r✳✇❤❡❡❧❚✉r♥) за один тик.
