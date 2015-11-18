@@ -68,8 +68,8 @@ public final class MyStrategy implements Strategy {
         double nextWaypointX = (self.getNextWaypointX() + 0.45D) * game.getTrackTileSize();
         double nextWaypointY = (self.getNextWaypointY() + 0.45D) * game.getTrackTileSize();
 
-        double cornerTileOffset = 0.3D * game.getTrackTileSize();
-
+//        double cornerTileOffset = 0.3D * game.getTrackTileSize();
+        double cornerTileOffset;
         if (move.isUseNitro()) {
             cornerTileOffset = 0.6D * game.getTrackTileSize();
         } else {
@@ -114,18 +114,101 @@ public final class MyStrategy implements Strategy {
 
     //Задаём манеру передвижения при нормальных условиях
     public void moveTo(Car self, World world, Game game, Move move, double nextWaypointX, double nextWaypointY){
+        //Если участок прямой, то применяем стандартную стратегию
+        if(nextWayToCheckpointIsStraightLine(self, world, game, move)) {
+            double angleToWaypoint = self.getAngleTo(nextWaypointX, nextWaypointY);
+            double speedModule = hypot(self.getSpeedX(), self.getSpeedY());
 
-        double angleToWaypoint = self.getAngleTo(nextWaypointX, nextWaypointY);
-        double speedModule = hypot(self.getSpeedX(), self.getSpeedY());
+            move.setWheelTurn(angleToWaypoint * 12.0D / PI);
+            move.setEnginePower(maxEngineValue);
 
-        move.setWheelTurn(angleToWaypoint * 12.0D / PI);
-        move.setEnginePower(maxEngineValue);
+            double coefBrake = 5.5D * 5.5D * PI;
+            if (speedModule * speedModule * abs(angleToWaypoint) > coefBrake) {
+                move.setSpillOil(true);
+                move.setBrake(!move.isBrake());
+            }
+        }else{
+            //Если участок сложный, то применяем спец.стратегию
+            double angleToWaypoint = self.getAngleTo(nextWaypointX, nextWaypointY);
+            double speedModule = hypot(self.getSpeedX(), self.getSpeedY());
 
-        double coefBrake = 5.5D * 5.5D * PI;
-        if (speedModule * speedModule * abs(angleToWaypoint) > coefBrake) {
-            move.setSpillOil(true);
-            move.setBrake(!move.isBrake());
+            move.setWheelTurn(angleToWaypoint * 12.0D / PI);
+            move.setEnginePower(maxEngineValue);
+
+            double coefBrake = 5.5D * 5.5D * PI;
+            if (speedModule * speedModule * abs(angleToWaypoint) > coefBrake) {
+                move.setSpillOil(true);
+                move.setBrake(!move.isBrake());
+            }
         }
+//        System.out.println(nextWayToCheckpointIsStraightLine(self, world, game, move));
+    }
+
+    public boolean nextWayToCheckpointIsStraightLine(Car self, World world, Game game, Move move) {
+        //Определение оптимальности маршрута
+        int wpX = self.getNextWaypointX();
+        int wpY = self.getNextWaypointY();
+        int wpIndex = self.getNextWaypointIndex();
+
+        int selfX = (int) (self.getX() / game.getTrackTileSize());
+        int selfY = (int) (self.getY() / game.getTrackTileSize());
+
+        int deltaX = wpX - selfX;
+        int deltaY = wpY - selfY;
+        //Если не на прямой, то сразу применяем альтернативную тактику
+        if (Math.abs(deltaX) > 0 && Math.abs(deltaY) > 0) {
+            //Устанавливаем промежуточный WayPoint
+            return false;
+        } else {
+            //Проверяем есть ли соединение на прямых тайлах
+
+            int counterTiles = 0;
+            //Едем по горизонтали
+            if (deltaX != 0) {
+                int i = wpX > selfX ? selfX : wpX;
+                int iLim = wpX > selfX ? wpX : selfX;
+                int j = selfY;
+
+
+                for (; i < iLim; i++) {
+                    TileType type = world.getTilesXY()[i][j];
+                    switch (type) {
+                        case HORIZONTAL:
+                        case CROSSROADS:
+                        case TOP_HEADED_T:
+                        case BOTTOM_HEADED_T:
+                            counterTiles++;
+                            break;
+                        default:
+                            return false;
+                    }
+                }
+                return true;
+
+            } else {
+                int i = selfX;
+                int j = wpY > selfY ? selfY : wpY;
+                int jLim = wpY > selfY ? wpY : selfY;
+
+                for (; j < jLim; j++) {
+                    TileType type = world.getTilesXY()[i][j];
+                    switch (type) {
+                        case VERTICAL:
+                        case CROSSROADS:
+                        case RIGHT_HEADED_T:
+                        case LEFT_HEADED_T:
+                            counterTiles++;
+                            break;
+                        default:
+                            return false;
+                    }
+                }
+                return true;
+            }
+
+
+        }
+//        System.out.println("1");
     }
 
     //Проверка на застревание
@@ -219,7 +302,100 @@ public final class MyStrategy implements Strategy {
         }
     }
 
-    //Оценка возможности подбора бонусов
+
+
+    public static void firstCheck(World world) {
+        System.out.println("TILES");
+        for(int i=0; i<world.getWidth()-1; i++){
+            System.out.print(i + "\t\t\t\t\t\t");
+        }
+        System.out.println(world.getWidth()-1);
+
+        for(int j=0; j<world.getHeight(); j++){
+            for(int i=0; i<world.getWidth()-1; i++){
+                TileType type = world.getTilesXY()[i][j];
+                StringBuilder text=new StringBuilder();
+                if(i==0)
+                    text.append(j+"|");//Добавляем номер строчки, на первом столбце
+
+                text.append(type);
+                switch (type) {
+                    case EMPTY:
+                        System.out.print(text + "\t\t\t\t\t");
+                        break;
+                    case HORIZONTAL:
+                    case VERTICAL:
+                    case CROSSROADS:
+                        System.out.print(text + "\t\t\t\t");
+                        break;
+                    case LEFT_BOTTOM_CORNER:
+                        System.out.print(text + "\t");
+                        break;
+                    case RIGHT_BOTTOM_CORNER:
+                        System.out.print(text + "\t\t");
+                        break;
+                    case LEFT_TOP_CORNER:
+                        if(i==0)
+                            System.out.print(text + "\t\t");
+                        else
+                            System.out.print(text + "\t\t\t");
+                        break;
+                    default:
+                        System.out.print(text + "\t\t\t");
+                        break;
+
+                }
+            }
+            System.out.println(world.getTilesXY()[world.getWidth()-1][j]);
+        }
+
+        System.out.println("WAYPOINTS");
+        for(int i=0; i<world.getWaypoints().length; i++){
+            //[0] - X, [1] - Y
+            System.out.print("X: " + world.getWaypoints()[i][0]);
+            System.out.print (" Y: " + world.getWaypoints()[i][1] + "  |  ");
+        }
+        firstTick=false;
+
+
+//        //Построение неориентированного графа grafWay
+//        grafWay = new int[world.getWidth()][world.getHeight()];
+//
+//        for(int j=0; j<world.getHeight(); j++){
+//            for(int i=0; i<world.getWidth(); i++){
+//                TileType type = world.getTilesXY()[i][j];
+//                grafWay[i][j]=1;
+//                switch (type) {
+//                    case EMPTY:
+//                        System.out.print(text + "\t\t\t\t\t");
+//                        break;
+//                    case HORIZONTAL:
+//                    case VERTICAL:
+//                    case CROSSROADS:
+//                        System.out.print(text + "\t\t\t\t");
+//                        break;
+//                    case LEFT_BOTTOM_CORNER:
+//                        System.out.print(text + "\t");
+//                        break;
+//                    case RIGHT_BOTTOM_CORNER:
+//                        System.out.print(text + "\t\t");
+//                        break;
+//                    case LEFT_TOP_CORNER:
+//                        if(i==0)
+//                            System.out.print(text + "\t\t");
+//                        else
+//                            System.out.print(text + "\t\t\t");
+//                        break;
+//                    default:
+//                        System.out.print(text + "\t\t\t");
+//                        break;
+//
+//                }
+    }
+}
+//getCarWheelTurnChangePerTick - максимальное значение, на которое может измениться относительный угол поворота колёс кодемобиля (❝❛r✳✇❤❡❡❧❚✉r♥) за один тик.
+
+            //Оценка возможности подбора бонусов
 //    public void checkBonuses(Car self, World world, Game game, Move move){
 //        Bonus bonuses[] = world.getBonuses();
 //        double bonusClosest[]=new double[10];
@@ -288,103 +464,3 @@ public final class MyStrategy implements Strategy {
 ////                Arrays.sort(bonusClosest);getScore( )
 //        }
 //        }
-
-
-    public static void firstCheck(World world) {
-        System.out.println("TILES");
-        for(int i=0; i<world.getWidth()-1; i++){
-            System.out.print(i + "\t\t\t\t\t\t");
-        }
-        System.out.println(world.getWidth()-1);
-
-        for(int j=0; j<world.getHeight(); j++){
-            for(int i=0; i<world.getWidth()-1; i++){
-                TileType type = world.getTilesXY()[i][j];
-                StringBuilder text=new StringBuilder();
-                if(i==0)
-                    text.append(j+"|");//Добавляем номер строчки, на первом столбце
-
-                text.append(type);
-                switch (type) {
-                    case EMPTY:
-                        System.out.print(text + "\t\t\t\t\t");
-                        break;
-                    case HORIZONTAL:
-                    case VERTICAL:
-                    case CROSSROADS:
-                        System.out.print(text + "\t\t\t\t");
-                        break;
-                    case LEFT_BOTTOM_CORNER:
-                        System.out.print(text + "\t");
-                        break;
-                    case RIGHT_BOTTOM_CORNER:
-                        System.out.print(text + "\t\t");
-                        break;
-                    case LEFT_TOP_CORNER:
-                        if(i==0)
-                            System.out.print(text + "\t\t");
-                        else
-                            System.out.print(text + "\t\t\t");
-                        break;
-                    default:
-                        System.out.print(text + "\t\t\t");
-                        break;
-
-                }
-            }
-            System.out.println(world.getTilesXY()[world.getWidth()-1][j]);
-        }
-//
-//        for(int j=0; j<world.getHeight(); j++){
-//            for(int i=0; i<world.getWidth()-1; i++){
-//                System.out.print(i + ":" +j + " ");
-//            }
-//            System.out.println(world.getWidth() - 1 + ":" + j + " ");
-//        }
-
-        System.out.println("WAYPOINTS");
-        for(int i=0; i<world.getWaypoints().length; i++){
-            //[0] - X, [1] - Y
-            System.out.print("X: " + world.getWaypoints()[i][0]);
-            System.out.print (" Y: " + world.getWaypoints()[i][1] + "  |  ");
-        }
-        firstTick=false;
-
-
-//        //Построение неориентированного графа grafWay
-//        grafWay = new int[world.getWidth()][world.getHeight()];
-//
-//        for(int j=0; j<world.getHeight(); j++){
-//            for(int i=0; i<world.getWidth(); i++){
-//                TileType type = world.getTilesXY()[i][j];
-//                grafWay[i][j]=1;
-//                switch (type) {
-//                    case EMPTY:
-//                        System.out.print(text + "\t\t\t\t\t");
-//                        break;
-//                    case HORIZONTAL:
-//                    case VERTICAL:
-//                    case CROSSROADS:
-//                        System.out.print(text + "\t\t\t\t");
-//                        break;
-//                    case LEFT_BOTTOM_CORNER:
-//                        System.out.print(text + "\t");
-//                        break;
-//                    case RIGHT_BOTTOM_CORNER:
-//                        System.out.print(text + "\t\t");
-//                        break;
-//                    case LEFT_TOP_CORNER:
-//                        if(i==0)
-//                            System.out.print(text + "\t\t");
-//                        else
-//                            System.out.print(text + "\t\t\t");
-//                        break;
-//                    default:
-//                        System.out.print(text + "\t\t\t");
-//                        break;
-//
-//                }
-    }
-}
-//getCarWheelTurnChangePerTick - максимальное значение, на которое может измениться относительный угол поворота колёс кодемобиля (❝❛r✳✇❤❡❡❧❚✉r♥) за один тик.
-
