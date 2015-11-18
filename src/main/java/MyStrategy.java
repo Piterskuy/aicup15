@@ -12,10 +12,10 @@ public final class MyStrategy implements Strategy {
 
     private static boolean isStart=false;           //Гонка началась
 
-    private static final int ticksStuckIni=30;      //Количество тиков за которые если координаты не меняются - машина застряла
+    private static final int ticksStuckIni=15;      //Количество тиков за которые если координаты не меняются - машина застряла
     private static int ticksStuck=ticksStuckIni;   //Тиков до застревания
     private static boolean carStuck=false;          //Машина застряла
-    private static int ticksGetOutStuckIni=80;      //Количество тиков за которые машина пытается выбраться
+    private static int ticksGetOutStuckIni=70;      //Количество тиков за которые машина пытается выбраться
     private static int ticksGetOutStuck=ticksGetOutStuckIni;      //Тиков до продолжения движения
     private static boolean carGetOutStuckOperation=false;          //Операция по вызволению машины активирована
 
@@ -23,6 +23,7 @@ public final class MyStrategy implements Strategy {
     private static double goodWheelTurn = 0;
 
     private static boolean firstTick = true;
+    private static int[][] grafWay;
     //Задание движения
     @Override
     public void move(Car self, World world, Game game, Move move) {
@@ -291,21 +292,98 @@ public final class MyStrategy implements Strategy {
 
     public static void firstCheck(World world) {
         System.out.println("TILES");
+        for(int i=0; i<world.getWidth()-1; i++){
+            System.out.print(i + "\t\t\t\t\t\t");
+        }
+        System.out.println(world.getWidth()-1);
+
         for(int j=0; j<world.getHeight(); j++){
             for(int i=0; i<world.getWidth()-1; i++){
-                System.out.print(world.getTilesXY()[i][j] + " ");
+                TileType type = world.getTilesXY()[i][j];
+                StringBuilder text=new StringBuilder();
+                if(i==0)
+                    text.append(j+"|");//Добавляем номер строчки, на первом столбце
+
+                text.append(type);
+                switch (type) {
+                    case EMPTY:
+                        System.out.print(text + "\t\t\t\t\t");
+                        break;
+                    case HORIZONTAL:
+                    case VERTICAL:
+                    case CROSSROADS:
+                        System.out.print(text + "\t\t\t\t");
+                        break;
+                    case LEFT_BOTTOM_CORNER:
+                        System.out.print(text + "\t");
+                        break;
+                    case RIGHT_BOTTOM_CORNER:
+                        System.out.print(text + "\t\t");
+                        break;
+                    case LEFT_TOP_CORNER:
+                        if(i==0)
+                            System.out.print(text + "\t\t");
+                        else
+                            System.out.print(text + "\t\t\t");
+                        break;
+                    default:
+                        System.out.print(text + "\t\t\t");
+                        break;
+
+                }
             }
             System.out.println(world.getTilesXY()[world.getWidth()-1][j]);
         }
+//
+//        for(int j=0; j<world.getHeight(); j++){
+//            for(int i=0; i<world.getWidth()-1; i++){
+//                System.out.print(i + ":" +j + " ");
+//            }
+//            System.out.println(world.getWidth() - 1 + ":" + j + " ");
+//        }
 
         System.out.println("WAYPOINTS");
         for(int i=0; i<world.getWaypoints().length; i++){
             //[0] - X, [1] - Y
-            System.out.print("X: "+ world.getWaypoints()[i][0]);
-            System.out.println(" Y: " + world.getWaypoints()[i][1]);
+            System.out.print("X: " + world.getWaypoints()[i][0]);
+            System.out.print (" Y: " + world.getWaypoints()[i][1] + "  |  ");
         }
         firstTick=false;
 
+
+//        //Построение неориентированного графа grafWay
+//        grafWay = new int[world.getWidth()][world.getHeight()];
+//
+//        for(int j=0; j<world.getHeight(); j++){
+//            for(int i=0; i<world.getWidth(); i++){
+//                TileType type = world.getTilesXY()[i][j];
+//                grafWay[i][j]=1;
+//                switch (type) {
+//                    case EMPTY:
+//                        System.out.print(text + "\t\t\t\t\t");
+//                        break;
+//                    case HORIZONTAL:
+//                    case VERTICAL:
+//                    case CROSSROADS:
+//                        System.out.print(text + "\t\t\t\t");
+//                        break;
+//                    case LEFT_BOTTOM_CORNER:
+//                        System.out.print(text + "\t");
+//                        break;
+//                    case RIGHT_BOTTOM_CORNER:
+//                        System.out.print(text + "\t\t");
+//                        break;
+//                    case LEFT_TOP_CORNER:
+//                        if(i==0)
+//                            System.out.print(text + "\t\t");
+//                        else
+//                            System.out.print(text + "\t\t\t");
+//                        break;
+//                    default:
+//                        System.out.print(text + "\t\t\t");
+//                        break;
+//
+//                }
     }
 }
 //getCarWheelTurnChangePerTick - максимальное значение, на которое может измениться относительный угол поворота колёс кодемобиля (❝❛r✳✇❤❡❡❧❚✉r♥) за один тик.
