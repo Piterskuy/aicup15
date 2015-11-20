@@ -2,48 +2,53 @@ import model.*;
 
 
 import java.util.Arrays;
+import java.util.List;
 
 import static java.lang.StrictMath.*;
 
 public final class MyStrategy implements Strategy {
     //Сохранение состояния переменных
-    private static double prevGetX=-1.0;
-    private static double prevGetY=-1.0;
+    private static double prevGetX = -1.0;
+    private static double prevGetY = -1.0;
 
-    private static boolean isStart=false;           //Гонка началась
+    private static boolean isStart = false;           //Гонка началась
 
-    private static final int ticksStuckIni=15;      //Количество тиков за которые если координаты не меняются - машина застряла
-    private static int ticksStuck=ticksStuckIni;   //Тиков до застревания
-    private static boolean carStuck=false;          //Машина застряла
-    private static int ticksGetOutStuckIni=70;      //Количество тиков за которые машина пытается выбраться
-    private static int ticksGetOutStuck=ticksGetOutStuckIni;      //Тиков до продолжения движения
-    private static boolean carGetOutStuckOperation=false;          //Операция по вызволению машины активирована
+    private static final int ticksStuckIni = 15;      //Количество тиков за которые если координаты не меняются - машина застряла
+    private static int ticksStuck = ticksStuckIni;   //Тиков до застревания
+    private static boolean carStuck = false;          //Машина застряла
+    private static int ticksGetOutStuckIni = 70;      //Количество тиков за которые машина пытается выбраться
+    private static int ticksGetOutStuck = ticksGetOutStuckIni;      //Тиков до продолжения движения
+    private static boolean carGetOutStuckOperation = false;          //Операция по вызволению машины активирована
 
-    private static double maxEngineValue=1.0D;          //Максимальное значение двигателя
+    private static double maxEngineValue = 1.0D;          //Максимальное значение двигателя
     private static double goodWheelTurn = 0;
 
     private static boolean firstTick = true;
-    private static int[][] grafWay;
+    private static int[][] myWayPoints;
+    Map<ExampleNode> myMap;
+
     //Задание движения
     @Override
     public void move(Car self, World world, Game game, Move move) {
-        if(firstTick)
+        if (firstTick) {
             firstCheck(world);
-
-        if(!carStuck) {
-            double nextWaypoint[] = new double [1];
+            makeMyWay(self, world, game, move);
+//            myWayToCheckpoint(self, world, game, move);
+        }
+        if (!carStuck) {
+            double nextWaypoint[] = new double[1];
             nextWaypoint = getDirection(self, world, game, move);
             moveTo(self, world, game, move, nextWaypoint[0], nextWaypoint[1]);
 //            move.setEnginePower(0.3D);
             //Если игра началась
             if (world.getTick() > game.getInitialFreezeDurationTicks()) {
 
-                if(self.getEnginePower()>0){
-                    isStart=true;
+                if (self.getEnginePower() > 0) {
+                    isStart = true;
                 }
 
                 if (self.getNitroChargeCount() > 0 && self.getRemainingNitroCooldownTicks() == 0 && !move.isUseNitro()) {
-                    if(self.getDistanceTo(nextWaypoint[0], nextWaypoint[1])>2500){
+                    if (self.getDistanceTo(nextWaypoint[0], nextWaypoint[1]) > 2500) {
                         move.setUseNitro(true);
                     }
                 }
@@ -52,15 +57,15 @@ public final class MyStrategy implements Strategy {
 
             isStuck(self, world, game, move, nextWaypoint[0], nextWaypoint[1]);
 
-        }else{
+        } else {
             //Если мы застряли
             getOutOfStuck(self, world, game, move);
         }
 
         attack(self, world, game, move);
         //Обновляем наше местоположение
-        prevGetX=self.getX();
-        prevGetY=self.getY();
+        prevGetX = self.getX();
+        prevGetY = self.getY();
     }
 
     //Устанавливаем следующий checkPoint
@@ -109,188 +114,108 @@ public final class MyStrategy implements Strategy {
             maxEngineValue /= 1.3D;
 
 //        System.out.println(world.getTilesXY()[self.getNextWaypointX()][self.getNextWaypointY()].toString());
-        return new double []{nextWaypointX,nextWaypointY};
+        return new double[]{nextWaypointX, nextWaypointY};
     }
 
     //Задаём манеру передвижения при нормальных условиях
-    public void moveTo(Car self, World world, Game game, Move move, double nextWaypointX, double nextWaypointY){
+    public void moveTo(Car self, World world, Game game, Move move, double nextWaypointX, double nextWaypointY) {
+
         //Если участок прямой, то применяем стандартную стратегию
-        if(nextWayToCheckpointIsStraightLine(self, world, game, move)) {
-            double angleToWaypoint = self.getAngleTo(nextWaypointX, nextWaypointY);
-            double speedModule = hypot(self.getSpeedX(), self.getSpeedY());
+        double angleToWaypoint = self.getAngleTo(nextWaypointX, nextWaypointY);
+        double speedModule = hypot(self.getSpeedX(), self.getSpeedY());
 
-            move.setWheelTurn(angleToWaypoint * 12.0D / PI);
-            move.setEnginePower(maxEngineValue);
+        move.setWheelTurn(angleToWaypoint * 12.0D / PI);
+        move.setEnginePower(maxEngineValue);
 
-            double coefBrake = 5.5D * 5.5D * PI;
-            if (speedModule * speedModule * abs(angleToWaypoint) > coefBrake) {
-                move.setSpillOil(true);
-                move.setBrake(!move.isBrake());
-            }
-        }else{
-            //Если участок сложный, то применяем спец.стратегию
-            double angleToWaypoint = self.getAngleTo(nextWaypointX, nextWaypointY);
-            double speedModule = hypot(self.getSpeedX(), self.getSpeedY());
-
-            move.setWheelTurn(angleToWaypoint * 12.0D / PI);
-            move.setEnginePower(maxEngineValue);
-
-            double coefBrake = 5.5D * 5.5D * PI;
-            if (speedModule * speedModule * abs(angleToWaypoint) > coefBrake) {
-                move.setSpillOil(true);
-                move.setBrake(!move.isBrake());
-            }
+        double coefBrake = 5.5D * 5.5D * PI;
+        if (speedModule * speedModule * abs(angleToWaypoint) > coefBrake) {
+            move.setSpillOil(true);
+            move.setBrake(!move.isBrake());
         }
+
 //        System.out.println(nextWayToCheckpointIsStraightLine(self, world, game, move));
     }
 
-    public boolean nextWayToCheckpointIsStraightLine(Car self, World world, Game game, Move move) {
-        //Определение оптимальности маршрута
-        int wpX = self.getNextWaypointX();
-        int wpY = self.getNextWaypointY();
-        int wpIndex = self.getNextWaypointIndex();
-
-        int selfX = (int) (self.getX() / game.getTrackTileSize());
-        int selfY = (int) (self.getY() / game.getTrackTileSize());
-
-        int deltaX = wpX - selfX;
-        int deltaY = wpY - selfY;
-        //Если не на прямой, то сразу применяем альтернативную тактику
-        if (Math.abs(deltaX) > 0 && Math.abs(deltaY) > 0) {
-            //Устанавливаем промежуточный WayPoint
-            return false;
-        } else {
-            //Проверяем есть ли соединение на прямых тайлах
-
-            int counterTiles = 0;
-            //Едем по горизонтали
-            if (deltaX != 0) {
-                int i = wpX > selfX ? selfX : wpX;
-                int iLim = wpX > selfX ? wpX : selfX;
-                int j = selfY;
-
-
-                for (; i < iLim; i++) {
-                    TileType type = world.getTilesXY()[i][j];
-                    switch (type) {
-                        case HORIZONTAL:
-                        case CROSSROADS:
-                        case TOP_HEADED_T:
-                        case BOTTOM_HEADED_T:
-                            counterTiles++;
-                            break;
-                        default:
-                            return false;
-                    }
-                }
-                return true;
-
-            } else {
-                int i = selfX;
-                int j = wpY > selfY ? selfY : wpY;
-                int jLim = wpY > selfY ? wpY : selfY;
-
-                for (; j < jLim; j++) {
-                    TileType type = world.getTilesXY()[i][j];
-                    switch (type) {
-                        case VERTICAL:
-                        case CROSSROADS:
-                        case RIGHT_HEADED_T:
-                        case LEFT_HEADED_T:
-                            counterTiles++;
-                            break;
-                        default:
-                            return false;
-                    }
-                }
-                return true;
-            }
-
-
-        }
-//        System.out.println("1");
-    }
-
     //Проверка на застревание
-    public void isStuck(Car self, World world, Game game, Move move, double nextWaypointX, double nextWaypointY){
+    public void isStuck(Car self, World world, Game game, Move move, double nextWaypointX, double nextWaypointY) {
         //Если гонка идёт и мы целы, а координаты не меняются уже ticksStuckIni тиков
-        if(isStart & self.getDurability()>0){
+        if (isStart & self.getDurability() > 0) {
 
-            double dX = prevGetX-self.getX();
-            double dY = prevGetY-self.getY();
+            double dX = prevGetX - self.getX();
+            double dY = prevGetY - self.getY();
             double delta = 0.5;
             if (Math.abs(dX) + Math.abs(dY) <= delta) {
                 ticksStuck--;//Запускаем обратный отсчёт
                 //Если количество тиков вышло - машина застряла
-                if(ticksStuck<0) {
+                if (ticksStuck < 0) {
                     carStuck = true;
-                    ticksGetOutStuck=ticksGetOutStuckIni;
+                    ticksGetOutStuck = ticksGetOutStuckIni;
 //                    moveTo(self, world, game, move, nextWaypointX, nextWaypointY);
                     goodWheelTurn = move.getWheelTurn();
                 }
-            }else {
+            } else {
                 //Если машина сдвинулась с места - обновляем счётчик
-                ticksStuck=ticksStuckIni;
+                ticksStuck = ticksStuckIni;
             }
         }
     }
 
 
-    public void setGoodWheelTurn(Car self, World world, Game game, Move move,double nextWaypoint[]){
+    public void setGoodWheelTurn(Car self, World world, Game game, Move move, double nextWaypoint[]) {
         double angleToWaypoint = self.getAngleTo(nextWaypoint[0], nextWaypoint[1]);
-        goodWheelTurn =angleToWaypoint * 12.0D / PI;
+        goodWheelTurn = angleToWaypoint * 12.0D / PI;
     }
 
     //Стратегия возврата в гонку, если машина застряла
-    public void getOutOfStuck(Car self, World world, Game game, Move move){
+    public void getOutOfStuck(Car self, World world, Game game, Move move) {
         //Когда начинаем выбираться, едем назад
-        if(carGetOutStuckOperation){
+        if (carGetOutStuckOperation) {
             ticksGetOutStuck--;
             move.setEnginePower(-1.0D);//Едем назад
             move.setWheelTurn(-goodWheelTurn);
 
-            if(ticksGetOutStuck<=0) {
+            if (ticksGetOutStuck <= 0) {
                 //Уходим по таймеру в минус и ждём пока машина затормозит после заднего хода
                 move.setEnginePower(1.0D);//Едем вперёд
 
-                if(self.getEnginePower()>0){
+                if (self.getEnginePower() > 0) {
                     //Если машина готова к езде, выходим из операции спасения
                     carStuck = false;
-                    carGetOutStuckOperation=false;
-                    ticksStuck=ticksStuckIni;
-                }else if (self.getEnginePower()>-0.3D) {
+                    carGetOutStuckOperation = false;
+                    ticksStuck = ticksStuckIni;
+                } else if (self.getEnginePower() > -0.3D) {
                     setGoodWheelTurn(self, world, game, move, getDirection(self, world, game, move));
                     move.setWheelTurn(goodWheelTurn);
                 }
             }
-        } else{
+        } else {
             move.setBrake(true);
-            carGetOutStuckOperation=true;
+            carGetOutStuckOperation = true;
         }
     }
 
     //Оценка возможности атаки
-    public void attack(Car self, World world, Game game, Move move){
-        if (isStart & self.getProjectileCount() > 0 & self.getRemainingProjectileCooldownTicks()<=0) {
+    public void attack(Car self, World world, Game game, Move move) {
+        if (isStart & self.getProjectileCount() > 0 & self.getRemainingProjectileCooldownTicks() <= 0) {
             Car cars[] = world.getCars();
-            double carClosest[]=new double[4];
-            int i=0;
-            for(Car car :cars ){
-                carClosest[i]= self.getDistanceTo(car.getX(),car.getY());
+            double carClosest[] = new double[4];
+            int i = 0;
+            for (Car car : cars) {
+                carClosest[i] = self.getDistanceTo(car.getX(), car.getY());
                 i++;
             }
             Arrays.sort(carClosest);
 
             //Если противник в пределах видимости, то атакуем
-            if(carClosest[1]<1100){
+            if (carClosest[1] < 1100) {
 
-                i=0;
-                for(Car car :cars ){
+                i = 0;
+                for (Car car : cars) {
                     double delta = 1;
-                    if(Math.abs(carClosest[i]-self.getDistanceTo(car.getX(),car.getY()))<= delta){
-                        double angleToOpponent = self.getAngleTo(car.getX(),car.getY());
+                    if (Math.abs(carClosest[i] - self.getDistanceTo(car.getX(), car.getY())) <= delta) {
+                        double angleToOpponent = self.getAngleTo(car.getX(), car.getY());
                         delta = 0.15;
-                        if(Math.abs(angleToOpponent)<= delta){
+                        if (Math.abs(angleToOpponent) <= delta) {
                             move.setThrowProjectile(true);
 
                         }
@@ -303,20 +228,19 @@ public final class MyStrategy implements Strategy {
     }
 
 
-
     public static void firstCheck(World world) {
         System.out.println("TILES");
-        for(int i=0; i<world.getWidth()-1; i++){
+        for (int i = 0; i < world.getWidth() - 1; i++) {
             System.out.print(i + "\t\t\t\t\t\t");
         }
-        System.out.println(world.getWidth()-1);
+        System.out.println(world.getWidth() - 1);
 
-        for(int j=0; j<world.getHeight(); j++){
-            for(int i=0; i<world.getWidth()-1; i++){
+        for (int j = 0; j < world.getHeight(); j++) {
+            for (int i = 0; i < world.getWidth() - 1; i++) {
                 TileType type = world.getTilesXY()[i][j];
-                StringBuilder text=new StringBuilder();
-                if(i==0)
-                    text.append(j+"|");//Добавляем номер строчки, на первом столбце
+                StringBuilder text = new StringBuilder();
+                if (i == 0)
+                    text.append(j + "|");//Добавляем номер строчки, на первом столбце
 
                 text.append(type);
                 switch (type) {
@@ -335,7 +259,7 @@ public final class MyStrategy implements Strategy {
                         System.out.print(text + "\t\t");
                         break;
                     case LEFT_TOP_CORNER:
-                        if(i==0)
+                        if (i == 0)
                             System.out.print(text + "\t\t");
                         else
                             System.out.print(text + "\t\t\t");
@@ -346,16 +270,16 @@ public final class MyStrategy implements Strategy {
 
                 }
             }
-            System.out.println(world.getTilesXY()[world.getWidth()-1][j]);
+            System.out.println(world.getTilesXY()[world.getWidth() - 1][j]);
         }
 
         System.out.println("WAYPOINTS");
-        for(int i=0; i<world.getWaypoints().length; i++){
+        for (int i = 0; i < world.getWaypoints().length; i++) {
             //[0] - X, [1] - Y
             System.out.print("X: " + world.getWaypoints()[i][0]);
-            System.out.print (" Y: " + world.getWaypoints()[i][1] + "  |  ");
+            System.out.print(" Y: " + world.getWaypoints()[i][1] + "  |  ");
         }
-        firstTick=false;
+        firstTick = false;
 
 
 //        //Построение неориентированного графа grafWay
@@ -392,7 +316,129 @@ public final class MyStrategy implements Strategy {
 //
 //                }
     }
+
+
+    public void myWayToCheckpoint(Car self, World world, Game game, Move move) {
+        //Определение оптимальности маршрута
+
+        //копируем себе контрольные точки на карте
+        myWayPoints = world.getWaypoints();
+        int myWpIndex = 0;
+        int prevWpX = (int) (self.getX() / game.getTrackTileSize());
+        int prevWpY = (int) (self.getY() / game.getTrackTileSize());
+
+        //Перебираем все Waypoint's
+        for (int wpIndex = 0; wpIndex < world.getWaypoints().length; wpIndex++) {
+            //[0] - X, [1] - Y
+            System.out.print("X: " + world.getWaypoints()[wpIndex][0]);
+            System.out.print(" Y: " + world.getWaypoints()[wpIndex][1] + "  |  ");
+            int wpX = world.getWaypoints()[wpIndex][0];
+            int wpY = world.getWaypoints()[wpIndex][1];
+
+            int deltaX = wpX - prevWpX;
+            int deltaY = wpY - prevWpY;
+
+            //Если не на прямой, то сразу применяем альтернативную тактику
+            if (Math.abs(deltaX) > 0 && Math.abs(deltaY) > 0) {
+                //Устанавливаем промежуточный WayPoint
+
+
+
+            } else {
+                //Проверяем есть ли соединение на прямых тайлах
+
+                int counterTiles = 0;
+                //Едем по горизонтали
+                if (deltaX != 0) {
+                    int i = wpX > prevWpX ? prevWpX : wpX;
+                    int iLim = wpX > prevWpX ? wpX : prevWpX;
+                    int j = prevWpY;
+
+
+                    for (; i < iLim; i++) {
+                        TileType type = world.getTilesXY()[i][j];
+                        switch (type) {
+                            case HORIZONTAL:
+                            case CROSSROADS:
+                            case TOP_HEADED_T:
+                            case BOTTOM_HEADED_T:
+                                counterTiles++;
+                                break;
+                            default:
+                                return;//false
+                        }
+                    }
+                    return;//true
+
+                } else {
+                    int i = prevWpX;
+                    int j = wpY > prevWpY ? prevWpY : wpY;
+                    int jLim = wpY > prevWpY ? wpY : prevWpY;
+
+                    for (; j < jLim; j++) {
+                        TileType type = world.getTilesXY()[i][j];
+                        switch (type) {
+                            case VERTICAL:
+                            case CROSSROADS:
+                            case RIGHT_HEADED_T:
+                            case LEFT_HEADED_T:
+                                counterTiles++;
+                                break;
+                            default:
+                                return;//false
+                        }
+                    }
+                    return;//true
+                }
+
+
+            }
+
+            prevWpX = wpX;
+            prevWpY = wpY;
+            myWpIndex++;
+        }
+    }
+
+    public void insertIntoMyWaypoints(Car self, World world, Game game, Move move, int wpX, int wpY) {
+        //Базовые значения из которых нужно построить маршрут до wpX и wpY
+        int baseX = myWayPoints[myWayPoints.length-1][0];
+        int baseY = myWayPoints[myWayPoints.length-1][1];
+        //Точки назначения
+
+
+    }
+
+    public void makeMyWay(Car self, World world, Game game, Move move) {
+         myMap = new Map<ExampleNode>(world.getWidth(), world.getHeight(), new ExampleFactory());
+
+        for (int j = 0; j < world.getHeight(); j++) {
+            for (int i = 0; i < world.getWidth(); i++) {
+                TileType type = world.getTilesXY()[i][j];
+                switch (type){
+                    case EMPTY:
+                        myMap.getNode(i,j).setWalkable(false);
+                        break;
+                }
+            }
+        }
+        myMap.drawMap();
+        int prevWpX = (int) (self.getX() / game.getTrackTileSize());
+        int prevWpY = (int) (self.getY() / game.getTrackTileSize());
+
+
+        List<ExampleNode> path = myMap.findPath(prevWpX, prevWpY, 40, 40);
+
+//        List<ExampleNode> path = myMap.findPath(12, 0, 40, 40);
+    }
+
+
 }
+
+
+
+
+
 //getCarWheelTurnChangePerTick - максимальное значение, на которое может измениться относительный угол поворота колёс кодемобиля (❝❛r✳✇❤❡❡❧❚✉r♥) за один тик.
 
             //Оценка возможности подбора бонусов
