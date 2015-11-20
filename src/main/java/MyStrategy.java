@@ -26,17 +26,21 @@ public final class MyStrategy implements Strategy {
     private static boolean firstTick = true;
     private static int[][] myWayPoints;
     Map<ExampleNode> myMap;
+    private static int myNewTacticCount=0;
 
     //Задание движения
     @Override
     public void move(Car self, World world, Game game, Move move) {
+        if(self.isFinishedTrack())
+            System.out.println("Использовано раз" + myNewTacticCount);
+
         if (firstTick) {
             firstCheck(world);
             makeMyWay(self, world, game, move);
 //            myWayToCheckpoint(self, world, game, move);
         }
         if (!carStuck) {
-            double nextWaypoint[] = new double[1];
+            double nextWaypoint[];
             nextWaypoint = getDirection(self, world, game, move);
             moveTo(self, world, game, move, nextWaypoint[0], nextWaypoint[1]);
 //            move.setEnginePower(0.3D);
@@ -70,8 +74,32 @@ public final class MyStrategy implements Strategy {
 
     //Устанавливаем следующий checkPoint
     public double[] getDirection(Car self, World world, Game game, Move move) {
-        double nextWaypointX = (self.getNextWaypointX() + 0.45D) * game.getTrackTileSize();
-        double nextWaypointY = (self.getNextWaypointY() + 0.45D) * game.getTrackTileSize();
+        int nextX;
+        int  nextY;
+        if(myWayToCheckpoint(self, world, game, move)){
+            nextX=self.getNextWaypointX();
+            nextY=self.getNextWaypointY();
+        }else{
+            int prevWpX = (int) (self.getX() / game.getTrackTileSize());
+            int prevWpY = (int) (self.getY() / game.getTrackTileSize());
+
+            int wpX = self.getNextWaypointX();
+            int wpY = self.getNextWaypointY();
+
+            List<ExampleNode> path = myMap.findPath(prevWpX, prevWpY, wpX, wpY);
+
+//            for (int i = 0; i < path.size(); i++) {
+//                System.out.print("(" + path.get(i).getxPosition() + ", " + path.get(i).getyPosition() + ") -> ");
+//            }
+
+    //        double nextWaypointX = (self.getNextWaypointX() + 0.45D) * game.getTrackTileSize();
+    //        double nextWaypointY = (self.getNextWaypointY() + 0.45D) * game.getTrackTileSize();
+            nextX=path.get(0).getxPosition();
+            nextY=path.get(0).getyPosition();
+            myNewTacticCount++;
+        }
+        double nextWaypointX = ( nextX + 0.45D) * game.getTrackTileSize();
+        double nextWaypointY = ( nextY + 0.45D) * game.getTrackTileSize();
 
 //        double cornerTileOffset = 0.3D * game.getTrackTileSize();
         double cornerTileOffset;
@@ -81,7 +109,8 @@ public final class MyStrategy implements Strategy {
             cornerTileOffset = 0.3D * game.getTrackTileSize();
         }
 
-        switch (world.getTilesXY()[self.getNextWaypointX()][self.getNextWaypointY()]) {
+//        switch (world.getTilesXY()[self.getNextWaypointX()][self.getNextWaypointY()]) {
+        switch (world.getTilesXY()[nextX][nextY]) {
             case LEFT_TOP_CORNER:
                 nextWaypointX += cornerTileOffset;
                 nextWaypointY += cornerTileOffset;
@@ -110,6 +139,7 @@ public final class MyStrategy implements Strategy {
             default:
                 maxEngineValue = 0.7D;
         }
+
         if (self.getRemainingNitroCooldownTicks() > 0)
             maxEngineValue /= 1.3D;
 
@@ -131,6 +161,8 @@ public final class MyStrategy implements Strategy {
         if (speedModule * speedModule * abs(angleToWaypoint) > coefBrake) {
             move.setSpillOil(true);
             move.setBrake(!move.isBrake());
+        }else if(move.isUseNitro() && self.getDistanceTo(self.getNextWaypointX(),self.getNextWaypointY())<1000){
+            move.setBrake(true);
         }
 
 //        System.out.println(nextWayToCheckpointIsStraightLine(self, world, game, move));
@@ -240,7 +272,7 @@ public final class MyStrategy implements Strategy {
                 TileType type = world.getTilesXY()[i][j];
                 StringBuilder text = new StringBuilder();
                 if (i == 0)
-                    text.append(j + "|");//Добавляем номер строчки, на первом столбце
+                    text.append("|");//Добавляем номер строчки, на первом столбце
 
                 text.append(type);
                 switch (type) {
@@ -318,22 +350,15 @@ public final class MyStrategy implements Strategy {
     }
 
 
-    public void myWayToCheckpoint(Car self, World world, Game game, Move move) {
+    public boolean myWayToCheckpoint(Car self, World world, Game game, Move move) {
         //Определение оптимальности маршрута
 
         //копируем себе контрольные точки на карте
         myWayPoints = world.getWaypoints();
-        int myWpIndex = 0;
         int prevWpX = (int) (self.getX() / game.getTrackTileSize());
         int prevWpY = (int) (self.getY() / game.getTrackTileSize());
-
-        //Перебираем все Waypoint's
-        for (int wpIndex = 0; wpIndex < world.getWaypoints().length; wpIndex++) {
-            //[0] - X, [1] - Y
-            System.out.print("X: " + world.getWaypoints()[wpIndex][0]);
-            System.out.print(" Y: " + world.getWaypoints()[wpIndex][1] + "  |  ");
-            int wpX = world.getWaypoints()[wpIndex][0];
-            int wpY = world.getWaypoints()[wpIndex][1];
+            int wpX = self.getNextWaypointX();
+        int wpY = self.getNextWaypointY();
 
             int deltaX = wpX - prevWpX;
             int deltaY = wpY - prevWpY;
@@ -341,9 +366,7 @@ public final class MyStrategy implements Strategy {
             //Если не на прямой, то сразу применяем альтернативную тактику
             if (Math.abs(deltaX) > 0 && Math.abs(deltaY) > 0) {
                 //Устанавливаем промежуточный WayPoint
-
-
-
+                return false;
             } else {
                 //Проверяем есть ли соединение на прямых тайлах
 
@@ -365,10 +388,10 @@ public final class MyStrategy implements Strategy {
                                 counterTiles++;
                                 break;
                             default:
-                                return;//false
+                                return false;
                         }
                     }
-                    return;//true
+                    return true;
 
                 } else {
                     int i = prevWpX;
@@ -385,19 +408,12 @@ public final class MyStrategy implements Strategy {
                                 counterTiles++;
                                 break;
                             default:
-                                return;//false
+                                return false;
                         }
                     }
-                    return;//true
+                    return true;
                 }
-
-
             }
-
-            prevWpX = wpX;
-            prevWpY = wpY;
-            myWpIndex++;
-        }
     }
 
     public void insertIntoMyWaypoints(Car self, World world, Game game, Move move, int wpX, int wpY) {
@@ -419,17 +435,33 @@ public final class MyStrategy implements Strategy {
                     case EMPTY:
                         myMap.getNode(i,j).setWalkable(false);
                         break;
+                    case CROSSROADS:
+                    case VERTICAL:
+                    case HORIZONTAL:
+                        myMap.getNode(i,j).sethCosts(1);
+                        break;
+                    case TOP_HEADED_T:
+                    case BOTTOM_HEADED_T:
+                    case RIGHT_HEADED_T:
+                    case LEFT_HEADED_T:
+                        myMap.getNode(i,j).sethCosts(5);
+                        break;
                 }
             }
         }
-        myMap.drawMap();
-        int prevWpX = (int) (self.getX() / game.getTrackTileSize());
-        int prevWpY = (int) (self.getY() / game.getTrackTileSize());
+//        myMap.drawMap();
 
-
-        List<ExampleNode> path = myMap.findPath(prevWpX, prevWpY, 40, 40);
-
-//        List<ExampleNode> path = myMap.findPath(12, 0, 40, 40);
+//        int prevWpX = (int) (self.getX() / game.getTrackTileSize());
+//        int prevWpY = (int) (self.getY() / game.getTrackTileSize());
+//
+//        int wpX = self.getNextWaypointX();
+//        int wpY = self.getNextWaypointY();
+//
+//        List<ExampleNode> path = myMap.findPath(prevWpX, prevWpY, wpX, wpY);
+//
+//        for (int i = 0; i < path.size(); i++) {
+//            System.out.print("(" + path.get(i).getxPosition() + ", " + path.get(i).getyPosition() + ") -> ");
+//        }
     }
 
 
