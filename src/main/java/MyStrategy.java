@@ -27,7 +27,7 @@ public final class MyStrategy implements Strategy {
     private static int[][] myWayPoints;
     Map<ExampleNode> myMap;
     private static int myNewTacticCount=0;
-
+    private static boolean definedMap = true;
     //Задание движения
     @Override
     public void move(Car self, World world, Game game, Move move) {
@@ -35,7 +35,7 @@ public final class MyStrategy implements Strategy {
             System.out.println("Использовано раз" + myNewTacticCount);
 
         if (firstTick) {
-            firstCheck(world);
+//            firstCheck(world);
             makeMyWay(self, world, game, move);
 //            myWayToCheckpoint(self, world, game, move);
         }
@@ -76,7 +76,7 @@ public final class MyStrategy implements Strategy {
     public double[] getDirection(Car self, World world, Game game, Move move) {
         int nextX;
         int  nextY;
-        if(myWayToCheckpoint(self, world, game, move)){
+        if(definedMap & myWayToCheckpoint(self, world, game, move)){
             nextX=self.getNextWaypointX();
             nextY=self.getNextWaypointY();
         }else{
@@ -259,68 +259,22 @@ public final class MyStrategy implements Strategy {
         }
     }
 
-
-    public static void firstCheck(World world) {
-        System.out.println("TILES");
-        for (int i = 0; i < world.getWidth() - 1; i++) {
-            System.out.print(i + "\t\t\t\t\t\t");
-        }
-        System.out.println(world.getWidth() - 1);
-
-        for (int j = 0; j < world.getHeight(); j++) {
-            for (int i = 0; i < world.getWidth() - 1; i++) {
-                TileType type = world.getTilesXY()[i][j];
-                StringBuilder text = new StringBuilder();
-                if (i == 0)
-                    text.append("|");//Добавляем номер строчки, на первом столбце
-
-                text.append(type);
-                switch (type) {
-                    case EMPTY:
-                        System.out.print(text + "\t\t\t\t\t");
-                        break;
-                    case HORIZONTAL:
-                    case VERTICAL:
-                    case CROSSROADS:
-                        System.out.print(text + "\t\t\t\t");
-                        break;
-                    case LEFT_BOTTOM_CORNER:
-                        System.out.print(text + "\t");
-                        break;
-                    case RIGHT_BOTTOM_CORNER:
-                        System.out.print(text + "\t\t");
-                        break;
-                    case LEFT_TOP_CORNER:
-                        if (i == 0)
-                            System.out.print(text + "\t\t");
-                        else
-                            System.out.print(text + "\t\t\t");
-                        break;
-                    default:
-                        System.out.print(text + "\t\t\t");
-                        break;
-
-                }
-            }
-            System.out.println(world.getTilesXY()[world.getWidth() - 1][j]);
-        }
-
-        System.out.println("WAYPOINTS");
-        for (int i = 0; i < world.getWaypoints().length; i++) {
-            //[0] - X, [1] - Y
-            System.out.print("X: " + world.getWaypoints()[i][0]);
-            System.out.print(" Y: " + world.getWaypoints()[i][1] + "  |  ");
-        }
-        firstTick = false;
-
-
-//        //Построение неориентированного графа grafWay
-//        grafWay = new int[world.getWidth()][world.getHeight()];
 //
-//        for(int j=0; j<world.getHeight(); j++){
-//            for(int i=0; i<world.getWidth(); i++){
+//    public static void firstCheck(World world) {
+//        System.out.println("TILES");
+//        for (int i = 0; i < world.getWidth() - 1; i++) {
+//            System.out.print(i + "\t\t\t\t\t\t");
+//        }
+//        System.out.println(world.getWidth() - 1);
+//
+//        for (int j = 0; j < world.getHeight(); j++) {
+//            for (int i = 0; i < world.getWidth() - 1; i++) {
 //                TileType type = world.getTilesXY()[i][j];
-//                grafWay[i][j]=1;
+//                StringBuilder text = new StringBuilder();
+//                if (i == 0)
+//                    text.append("|");//Добавляем номер строчки, на первом столбце
+//
+//                text.append(type);
 //                switch (type) {
 //                    case EMPTY:
 //                        System.out.print(text + "\t\t\t\t\t");
@@ -337,7 +291,7 @@ public final class MyStrategy implements Strategy {
 //                        System.out.print(text + "\t\t");
 //                        break;
 //                    case LEFT_TOP_CORNER:
-//                        if(i==0)
+//                        if (i == 0)
 //                            System.out.print(text + "\t\t");
 //                        else
 //                            System.out.print(text + "\t\t\t");
@@ -347,7 +301,19 @@ public final class MyStrategy implements Strategy {
 //                        break;
 //
 //                }
-    }
+//            }
+//            System.out.println(world.getTilesXY()[world.getWidth() - 1][j]);
+//        }
+//
+//        System.out.println("WAYPOINTS");
+//        for (int i = 0; i < world.getWaypoints().length; i++) {
+//            //[0] - X, [1] - Y
+//            System.out.print("X: " + world.getWaypoints()[i][0]);
+//            System.out.print(" Y: " + world.getWaypoints()[i][1] + "  |  ");
+//        }
+//        firstTick = false;
+//
+//    }
 
 
     public boolean myWayToCheckpoint(Car self, World world, Game game, Move move) {
@@ -416,14 +382,14 @@ public final class MyStrategy implements Strategy {
             }
     }
 
-    public void insertIntoMyWaypoints(Car self, World world, Game game, Move move, int wpX, int wpY) {
-        //Базовые значения из которых нужно построить маршрут до wpX и wpY
-        int baseX = myWayPoints[myWayPoints.length-1][0];
-        int baseY = myWayPoints[myWayPoints.length-1][1];
-        //Точки назначения
-
-
-    }
+//    public void insertIntoMyWaypoints(Car self, World world, Game game, Move move, int wpX, int wpY) {
+//        //Базовые значения из которых нужно построить маршрут до wpX и wpY
+//        int baseX = myWayPoints[myWayPoints.length-1][0];
+//        int baseY = myWayPoints[myWayPoints.length-1][1];
+//        //Точки назначения
+//
+//
+//    }
 
     public void makeMyWay(Car self, World world, Game game, Move move) {
          myMap = new Map<ExampleNode>(world.getWidth(), world.getHeight(), new ExampleFactory());
@@ -446,6 +412,12 @@ public final class MyStrategy implements Strategy {
                     case LEFT_HEADED_T:
                         myMap.getNode(i,j).sethCosts(5);
                         break;
+                    case UNKNOWN:
+                        myMap.getNode(i,j).setWalkable(false);
+                        definedMap=false;
+                        System.out.println("Мир неопределён");
+                        return;
+
                 }
             }
         }
