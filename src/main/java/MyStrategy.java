@@ -202,6 +202,33 @@ public final class MyStrategy implements Strategy {
 //        System.out.println(nextWayToCheckpointIsStraightLine(self, world, game, move));
     }
 
+//    //Задаём манеру передвижения при нормальных условиях
+//    public void checkEnemies(Car self, World world, Game game, Move move) {
+//
+//        //Если участок прямой, то применяем стандартную стратегию
+//        double angleToWaypoint = self.getAngleTo(nextWaypointX, nextWaypointY);
+//        double speedModule = hypot(self.getSpeedX(), self.getSpeedY());
+//
+//        move.setWheelTurn(angleToWaypoint * 12.0D / PI);
+//        move.setEnginePower(maxEngineValue);
+//
+//        double coefBrake = 5.5D * 5.5D * PI;
+//        if (speedModule * speedModule * abs(angleToWaypoint) > coefBrake) {
+//            move.setSpillOil(true);
+//            move.setBrake(!move.isBrake());
+//            move.setEnginePower(0.6);
+//            System.out.println("");
+//        }else if(move.isUseNitro() && self.getDistanceTo(self.getNextWaypointX(),self.getNextWaypointY())<1000){
+//            move.setBrake(true);
+//        }
+////        }else if(speedModule * speedModule * abs(angleToWaypoint)<coefBrake*2.5){
+////            move.setBrake(false);
+////            move.setEnginePower(1.0D);
+////        }
+//
+////        System.out.println(nextWayToCheckpointIsStraightLine(self, world, game, move));
+//    }
+
     //Проверка на застревание
     public void isStuck(Car self, World world, Game game, Move move, double nextWaypointX, double nextWaypointY) {
         //Если гонка идёт и мы целы, а координаты не меняются уже ticksStuckIni тиков
@@ -273,7 +300,7 @@ public final class MyStrategy implements Strategy {
             Arrays.sort(carClosest);
 
             //Если противник в пределах видимости, то атакуем
-            if (carClosest[1] < 1100) {
+            if (carClosest[1] < 1200) {
 
                 i = 0;
                 for (Car car : cars) {
@@ -299,7 +326,7 @@ public final class MyStrategy implements Strategy {
     public void useNitro(Car self, World world, Game game, Move move, double nextWaypoint[]) {
         if (isStart & self.getNitroChargeCount() > 0 & self.getRemainingNitroCooldownTicks() <= 0 && !move.isUseNitro()) {
 
-                if (straightTilesCounter>4 & world.getTick()>500) {
+                if (straightTilesCounter>4 & world.getTick()>500 & self.getDurability()>0.2) {
 //            double distToTurn = distanceToTurn(self, world, game, move)*game.getTrackTileSize();
 //            if (distToTurn > nitroDistance*10) {
 
