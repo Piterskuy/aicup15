@@ -280,7 +280,7 @@ public final class MyStrategy implements Strategy {
 //
 //                        }
 //                }
-////                        Player playersScore[] = new Player [4];
+///                        Player playersScore[] = new Player [4];
 ////                for(Player player :world.getPlayers() ){
 ////                    bonusClosest[i]= self.getDistanceTo(bonus.getX(),bonus.getY());
 ////                    i++;
