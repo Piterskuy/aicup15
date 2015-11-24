@@ -48,8 +48,8 @@ public final class MyStrategy implements Strategy {
         }
         if (!carStuck) {
             double nextWaypoint[];
-            nextWaypoint = getDirection(self, world, game, move);
             distanceToTurn(self, world, game, move);
+            nextWaypoint = getDirection(self, world, game, move);
             moveTo(self, world, game, move, nextWaypoint[0], nextWaypoint[1]);
 //            move.setEnginePower(0.3D);
 
@@ -77,10 +77,8 @@ public final class MyStrategy implements Strategy {
     public double[] getDirection(Car self, World world, Game game, Move move) {
         int nextX;
         int nextY;
-        if(definedMap & isWayToNextCheckpointStraight(self, world, game, move)){
-            nextX=self.getNextWaypointX();
-            nextY=self.getNextWaypointY();
-        }else{
+        if(definedMap & (!isWayToNextCheckpointStraight(self, world, game, move) | straightTilesCounter <= 1)){
+            //Стратегия Astar
             int prevWpX = (int) (self.getX() / game.getTrackTileSize());
             int prevWpY = (int) (self.getY() / game.getTrackTileSize());
 
@@ -93,10 +91,13 @@ public final class MyStrategy implements Strategy {
 //                System.out.print("(" + path.get(i).getxPosition() + ", " + path.get(i).getyPosition() + ") -> ");
 //            }
 
-
             nextX=path.get(0).getxPosition();
             nextY=path.get(0).getyPosition();
             myNewTacticCount++;
+        }else {
+            //Простая стратеги
+            nextX = self.getNextWaypointX();
+            nextY = self.getNextWaypointY();
         }
 
         //        double nextWaypointX = (self.getNextWaypointX() + 0.45D) * game.getTrackTileSize();
@@ -106,15 +107,22 @@ public final class MyStrategy implements Strategy {
         double speedModule = Math.abs(hypot(self.getSpeedX(), self.getSpeedY()));
 //        double cornerTileOffset = 0.3D * game.getTrackTileSize();
         double cornerTileOffset;
-        if (self.getRemainingNitroTicks() > 0) {
-            cornerTileOffset = 0.4D * game.getTrackTileSize();//Чем меньше, тем дальше точка входа
-            nextWaypointX = ( nextX + 0.5D) * game.getTrackTileSize();
-            nextWaypointY = ( nextY + 0.5D) * game.getTrackTileSize();
+
+        if (self.getRemainingNitroTicks() > 0 | speedModule>25) {
+            cornerTileOffset = 0.6D * game.getTrackTileSize();//Чем меньше, тем дальше точка входа//0.4
+            nextWaypointX = ( nextX + 0.45D) * game.getTrackTileSize();//0.5
+            nextWaypointY = ( nextY + 0.45D) * game.getTrackTileSize();
         } else {
-            cornerTileOffset = 0.3 * game.getTrackTileSize();
-            nextWaypointX = ( nextX + 0.52D) * game.getTrackTileSize();
-            nextWaypointY = ( nextY + 0.52D) * game.getTrackTileSize();
+            cornerTileOffset = 0.3D * game.getTrackTileSize();
+            nextWaypointX = ( nextX + 0.45D) * game.getTrackTileSize();//0.52
+            nextWaypointY = ( nextY + 0.45D) * game.getTrackTileSize();
         }
+
+//        if(speedModule>25){
+//            cornerTileOffset /=1.2;
+//            nextWaypointX = ( nextX + 0.3D) * game.getTrackTileSize();//0.52
+//            nextWaypointY = ( nextY + 0.3D) * game.getTrackTileSize();
+//        }
 //        int coefSpeed=20;
 //        cornerTileOffset = (0.3D + speedModule/coefSpeed)*game.getTrackTileSize() ;
 //        nextWaypointX = ( nextX + 0.35D) * game.getTrackTileSize() + (1-1/speedModule)*game.getTrackTileSize();
@@ -140,7 +148,7 @@ public final class MyStrategy implements Strategy {
                 nextWaypointX -= cornerTileOffset;
                 nextWaypointY -= cornerTileOffset;
                 maxEngineValue = 0.9D;
-                 break;
+                break;
             case HORIZONTAL:
             case VERTICAL:
             case CROSSROADS:
@@ -150,10 +158,18 @@ public final class MyStrategy implements Strategy {
                 maxEngineValue = 0.7D;
         }
 
+        //Перед поворотом сбавляем скорость
+//        if(straightTilesCounter<=1) {
+//            maxEngineValue /= 1.5;
+//            if(speedModule>22)
+//                move.setBrake(true);
+//        }
         //Если мы в повороте
 //        if(distanceToTurn(self, world, game, move)<=1){
 //            maxEngineValue = 0.5D;
 //        }
+        if (self.getRemainingNitroCooldownTicks() > 0)
+            maxEngineValue /= 1.3D;
 
 //        System.out.println(world.getTilesXY()[self.getNextWaypointX()][self.getNextWaypointY()].toString());
         return new double[]{nextWaypointX, nextWaypointY};
@@ -166,15 +182,17 @@ public final class MyStrategy implements Strategy {
         double angleToWaypoint = self.getAngleTo(nextWaypointX, nextWaypointY);
         double speedModule = hypot(self.getSpeedX(), self.getSpeedY());
 
-        move.setWheelTurn(angleToWaypoint * 22.0D / PI);
+        move.setWheelTurn(angleToWaypoint * 12.0D / PI);
         move.setEnginePower(maxEngineValue);
 
-        double coefBrake = 3.5D * 3.5D * PI;
+        double coefBrake = 5.5D * 5.5D * PI;
         if (speedModule * speedModule * abs(angleToWaypoint) > coefBrake) {
             move.setSpillOil(true);
-            move.setBrake(true);
-            move.setEnginePower(0.5);
+            move.setBrake(!move.isBrake());
+            move.setEnginePower(0.6);
             System.out.println("");
+        }else if(move.isUseNitro() && self.getDistanceTo(self.getNextWaypointX(),self.getNextWaypointY())<1000){
+            move.setBrake(true);
         }
 //        }else if(speedModule * speedModule * abs(angleToWaypoint)<coefBrake*2.5){
 //            move.setBrake(false);
@@ -281,14 +299,14 @@ public final class MyStrategy implements Strategy {
     public void useNitro(Car self, World world, Game game, Move move, double nextWaypoint[]) {
         if (isStart & self.getNitroChargeCount() > 0 & self.getRemainingNitroCooldownTicks() <= 0 && !move.isUseNitro()) {
 
-                if (straightTilesCounter>5) {
+                if (straightTilesCounter>4 & world.getTick()>500) {
 //            double distToTurn = distanceToTurn(self, world, game, move)*game.getTrackTileSize();
 //            if (distToTurn > nitroDistance*10) {
 
                     move.setUseNitro(true);
                 }
 
-            if(self.getDistanceTo(nextWaypoint[0], nextWaypoint[1]) <850) {
+//            if(self.getDistanceTo(nextWaypoint[0], nextWaypoint[1]) <850) {
 //            }
 //            Car cars[] = world.getCars();
 //            double carClosest[] = new double[4];
@@ -317,7 +335,7 @@ public final class MyStrategy implements Strategy {
 //                        i++;
 //                    }
 //                }
-            }
+//            }
 
         }
     }
@@ -446,8 +464,8 @@ public final class MyStrategy implements Strategy {
     }
 
     public void makeMyWay(Car self, World world, Game game, Move move) {
-        myMap = new Map<ExampleNode>(world.getWidth(), world.getHeight(), new ExampleFactory());
-        path = new LinkedList<ExampleNode>();
+        myMap = new Map<>(world.getWidth(), world.getHeight(), new ExampleFactory());
+        path = new LinkedList<>();
 
         for (int j = 0; j < world.getHeight(); j++) {
             for (int i = 0; i < world.getWidth(); i++) {
@@ -549,7 +567,7 @@ public final class MyStrategy implements Strategy {
 //
 //                        }
 //                }
-///                        Player playersScore[] = new Player [4];
+////                        Player playersScore[] = new Player [4];
 ////                for(Player player :world.getPlayers() ){
 ////                    bonusClosest[i]= self.getDistanceTo(bonus.getX(),bonus.getY());
 ////                    i++;
