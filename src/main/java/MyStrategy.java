@@ -60,6 +60,7 @@ public final class MyStrategy implements Strategy {
                     isStart = true;
                 }
             }
+
             useNitro(self, world, game, move, nextWaypoint);
             isStuck(self, world, game, move, nextWaypoint[0], nextWaypoint[1]);
 
