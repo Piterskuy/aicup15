@@ -33,12 +33,13 @@ public final class MyStrategy implements Strategy {
     private static int nitroDistance;
     private static int counterStraightTilesToNextWP;    //Упрощённый подсчёт прямых тайлов (до следующего WP)
     private static int straightTilesCounter;            //Полнный подсчёт прямых тайлов (до следующего поворота)
-
+    private static boolean oneTileBeforeTurn;
     //Задание движения
     @Override
     public void move(Car self, World world, Game game, Move move) {
-        if(self.isFinishedTrack())
-            System.out.println("Использовано раз" + myNewTacticCount);
+        oneTileBeforeTurn=false;
+//        if(self.isFinishedTrack())
+//            System.out.println("Использовано раз" + myNewTacticCount);
 
         if (firstTick) {
 //            firstCheck(world);
@@ -77,25 +78,39 @@ public final class MyStrategy implements Strategy {
     public double[] getDirection(Car self, World world, Game game, Move move) {
         int nextX;
         int nextY;
-        if(definedMap & (!isWayToNextCheckpointStraight(self, world, game, move) | straightTilesCounter <= 1)){
+//        int nextWPX=world.getWaypoints()[self.getNextWaypointIndex()][0];
+//        int nextWPY=world.getWaypoints()[self.getNextWaypointIndex()][1];
+//
+//        TileType nextWPTile = world.getTilesXY()[nextWPX][nextWPY];
+//ДОПИСАТЬ
+
+
+        if(definedMap & (!isWayToNextCheckpointStraight(self, world, game, move) | straightTilesCounter < 2)){
             //Стратегия Astar
             int prevWpX = (int) (self.getX() / game.getTrackTileSize());
             int prevWpY = (int) (self.getY() / game.getTrackTileSize());
-
-            int wpX = self.getNextWaypointX();
-            int wpY = self.getNextWaypointY();
-
-            path = myMap.findPath(prevWpX, prevWpY, wpX, wpY);
+            int wpX,wpY;
+            if(straightTilesCounter ==1){
+                int nextWP=self.getNextWaypointIndex()+1>world.getWaypoints().length-1?0:self.getNextWaypointIndex()+1;
+                wpX = world.getWaypoints()[nextWP][0];
+                wpY = world.getWaypoints()[nextWP][1];
+                oneTileBeforeTurn=true;
+            }else {
+                wpX = self.getNextWaypointX();
+                wpY = self.getNextWaypointY();
+            }
+                path = myMap.findPath(prevWpX, prevWpY, wpX, wpY);
 
 //            for (int i = 0; i < path.size(); i++) {
 //                System.out.print("(" + path.get(i).getxPosition() + ", " + path.get(i).getyPosition() + ") -> ");
 //            }
 
-            nextX=path.get(0).getxPosition();
-            nextY=path.get(0).getyPosition();
-            myNewTacticCount++;
+                nextX = path.get(0).getxPosition();
+                nextY = path.get(0).getyPosition();
+                myNewTacticCount++;
+
         }else {
-            //Простая стратеги
+            //Простая стратегия
             nextX = self.getNextWaypointX();
             nextY = self.getNextWaypointY();
         }
@@ -182,7 +197,13 @@ public final class MyStrategy implements Strategy {
         double angleToWaypoint = self.getAngleTo(nextWaypointX, nextWaypointY);
         double speedModule = hypot(self.getSpeedX(), self.getSpeedY());
 
-        move.setWheelTurn(angleToWaypoint * 12.0D / PI);
+        if(oneTileBeforeTurn) {
+            double coef=0.003*speedModule*speedModule+1;
+            move.setWheelTurn(angleToWaypoint * coef / PI);
+        }else{
+            double coef=0.045*speedModule*speedModule+1;//12.0D
+            move.setWheelTurn(angleToWaypoint * coef / PI);
+        }
         move.setEnginePower(maxEngineValue);
 
         double coefBrake = 5.5D * 5.5D * PI;
@@ -326,7 +347,7 @@ public final class MyStrategy implements Strategy {
     public void useNitro(Car self, World world, Game game, Move move, double nextWaypoint[]) {
         if (isStart & self.getNitroChargeCount() > 0 & self.getRemainingNitroCooldownTicks() <= 0 && !move.isUseNitro()) {
 
-                if (straightTilesCounter>4 & world.getTick()>500 & self.getDurability()>0.2) {
+                if (straightTilesCounter>4 & world.getTick()>500 & self.getDurability()>0.5) {
 //            double distToTurn = distanceToTurn(self, world, game, move)*game.getTrackTileSize();
 //            if (distToTurn > nitroDistance*10) {
 
@@ -376,6 +397,8 @@ public final class MyStrategy implements Strategy {
             System.out.print(" Y: " + world.getWaypoints()[i][1] + "  |  ");
         }
         firstTick = false;
+
+
     }
 
     //Возвращает расстояние до ближайшего поворота
@@ -392,12 +415,15 @@ public final class MyStrategy implements Strategy {
 
         //Если не на прямой, то сразу применяем альтернативную тактику
         if (Math.abs(deltaX) > 0 && Math.abs(deltaY) > 0) {
+
             //Устанавливаем промежуточный WayPoint
-            straightTilesCounter =0;
+            straightTilesCounter = 0;
             path = myMap.findPath(curX, curY, wpX, wpY);
         } else {
             int counterTiles = 0;
             int i = self.getNextWaypointIndex();
+            int prevWpX=wpX;
+            int prevWpY=wpY;
             //Едем по горизонтали
             if (deltaX != 0) {
                 for (; i < world.getWaypoints().length; i++) {
@@ -405,10 +431,12 @@ public final class MyStrategy implements Strategy {
                     int curWpY=world.getWaypoints()[i][1];
 
                     if (Math.abs(curWpY-curY) > 0){
-                        straightTilesCounter =Math.abs(curWpX-curX);
-                        path = myMap.findPath(curX, curY, curWpX, curWpY);
+                        straightTilesCounter = Math.abs(prevWpX-curX);
+                        path = myMap.findPath(curX, curY, prevWpX, prevWpY);
                         break;
                     }
+                    prevWpX=curWpX;
+                    prevWpY=curWpY;
                 }
             } else {
                 for (; i < world.getWaypoints().length; i++) {
@@ -416,12 +444,18 @@ public final class MyStrategy implements Strategy {
                     int curWpY=world.getWaypoints()[i][1];
 
                     if (Math.abs(curWpX-curX) > 0){
-                        straightTilesCounter =Math.abs(curWpY-curY);
-                        path = myMap.findPath(curX, curY, curWpX, curWpY);
+                        straightTilesCounter = Math.abs(prevWpY-curY);
+                        path = myMap.findPath(curX, curY, prevWpX, prevWpY);
                         break;
                     }
+                    prevWpX=curWpX;
+                    prevWpY=curWpY;
                 }
+
             }
+        }
+        if(world.getTick()>1300){
+            System.out.println("test");
         }
     }
 
