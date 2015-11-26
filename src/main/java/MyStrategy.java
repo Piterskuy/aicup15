@@ -17,7 +17,7 @@ public final class MyStrategy implements Strategy {
     private static final int ticksStuckIni = 15;      //Количество тиков за которые если координаты не меняются - машина застряла
     private static int ticksStuck = ticksStuckIni;   //Тиков до застревания
     private static boolean carStuck = false;          //Машина застряла
-    private static int ticksGetOutStuckIni = 70;      //Количество тиков за которые машина пытается выбраться
+    private static int ticksGetOutStuckIni = 90;      //Количество тиков за которые машина пытается выбраться
     private static int ticksGetOutStuck = ticksGetOutStuckIni;      //Тиков до продолжения движения
     private static boolean carGetOutStuckOperation = false;          //Операция по вызволению машины активирована
 
@@ -30,10 +30,26 @@ public final class MyStrategy implements Strategy {
     private static List<ExampleNode> path;
     private static int myNewTacticCount=0;
     private static boolean definedMap = true;
-    private static int nitroDistance;
+    private static int nitroUseDistance = 4;
     private static int counterStraightTilesToNextWP;    //Упрощённый подсчёт прямых тайлов (до следующего WP)
     private static int straightTilesCounter;            //Полнный подсчёт прямых тайлов (до следующего поворота)
     private static boolean oneTileBeforeTurn;
+
+    private static boolean useNewTactic=true;
+    //Коэффициенты повороты руля в тайле WP
+    private static double mapCoef11 = -0.000007;
+    private static double mapCoef12 = 0.04;
+    //Коэффициенты повороты руля за 1 тайл до WP
+    private static double mapCoef21 = -0.000083;
+    private static double mapCoef22 = 0.005;
+
+    //TODO разворот на map03 не идеален (предыдущая версия лучше проходила)
+    //TODO разворот на map04 ударения в змейку не идеальны (предыдущая версия лучше проходила), немного сгладил коэффициентами
+    //TODO map05 подгон не нужен но в целом хуже (на 200 тиков)
+    //map06, 07 отлично
+    //map08 = 5968 тиков сравнить (не идеальный проход)
+    //map09 - подкрутить коэффициенты поворотов а так ОК!
+    //TODO map10 TEST!!!
     //Задание движения
     @Override
     public void move(Car self, World world, Game game, Move move) {
@@ -123,13 +139,13 @@ public final class MyStrategy implements Strategy {
         double speedModule = Math.abs(hypot(self.getSpeedX(), self.getSpeedY()));
 //        double cornerTileOffset = 0.3D * game.getTrackTileSize();
         double cornerTileOffset;
-
+        double coefLongWay=straightTilesCounter>3?0.4:straightTilesCounter/7;
         if (self.getRemainingNitroTicks() > 0 | speedModule>25) {
-            cornerTileOffset = 0.6D * game.getTrackTileSize();//Чем меньше, тем дальше точка входа//0.4
+            cornerTileOffset = (0.6D-coefLongWay) * game.getTrackTileSize();//Чем меньше, тем дальше точка входа//0.4
             nextWaypointX = ( nextX + 0.45D) * game.getTrackTileSize();//0.5
             nextWaypointY = ( nextY + 0.45D) * game.getTrackTileSize();
         } else {
-            cornerTileOffset = 0.3D * game.getTrackTileSize();
+            cornerTileOffset = (0.3D-coefLongWay) * game.getTrackTileSize();
             nextWaypointX = ( nextX + 0.45D) * game.getTrackTileSize();//0.52
             nextWaypointY = ( nextY + 0.45D) * game.getTrackTileSize();
         }
@@ -184,8 +200,6 @@ public final class MyStrategy implements Strategy {
 //        if(distanceToTurn(self, world, game, move)<=1){
 //            maxEngineValue = 0.5D;
 //        }
-        if (self.getRemainingNitroCooldownTicks() > 0)
-            maxEngineValue /= 1.3D;
 
 //        System.out.println(world.getTilesXY()[self.getNextWaypointX()][self.getNextWaypointY()].toString());
         return new double[]{nextWaypointX, nextWaypointY};
@@ -198,12 +212,18 @@ public final class MyStrategy implements Strategy {
         double angleToWaypoint = self.getAngleTo(nextWaypointX, nextWaypointY);
         double speedModule = hypot(self.getSpeedX(), self.getSpeedY());
 
-        if(oneTileBeforeTurn) {
-            double coef=0.003*speedModule*speedModule+1;
-            move.setWheelTurn(angleToWaypoint * coef / PI);
+        //Если трасса сложная используем обновлённую тактику
+        if(useNewTactic) {
+            if (oneTileBeforeTurn) {
+                double coef = mapCoef21*Math.pow(speedModule,3)+ mapCoef22*Math.pow(speedModule,2) + 0.02976*speedModule + 1;
+                move.setWheelTurn(angleToWaypoint * coef / PI);
+            } else {
+                double coef =  mapCoef11*Math.pow(speedModule,3)+ mapCoef12*Math.pow(speedModule,2) + 0.001190476*speedModule + 1;//12.0D mapCoef 0.001190476
+
+                move.setWheelTurn(angleToWaypoint * coef / PI);
+            }
         }else{
-            double coef=0.045*speedModule*speedModule+1;//12.0D
-            move.setWheelTurn(angleToWaypoint * coef / PI);
+//            move.setWheelTurn(angleToWaypoint * 8.0D / PI);
         }
         move.setEnginePower(maxEngineValue);
 
@@ -348,7 +368,7 @@ public final class MyStrategy implements Strategy {
     public void useNitro(Car self, World world, Game game, Move move, double nextWaypoint[]) {
         if (isStart & self.getNitroChargeCount() > 0 & self.getRemainingNitroCooldownTicks() <= 0 && !move.isUseNitro()) {
 
-                if (straightTilesCounter>4 & world.getTick()>500 & self.getDurability()>0.5) {
+                if (straightTilesCounter>nitroUseDistance & world.getTick()>500 & self.getDurability()>0.5) {
 //            double distToTurn = distanceToTurn(self, world, game, move)*game.getTrackTileSize();
 //            if (distToTurn > nitroDistance*10) {
 
@@ -389,7 +409,7 @@ public final class MyStrategy implements Strategy {
         }
     }
     public static void calcParams(World world, Game game){
-        nitroDistance=(int)game.getNitroEnginePowerFactor()*game.getNitroDurationTicks();
+//        nitroDistance=(int)game.getNitroEnginePowerFactor()*game.getNitroDurationTicks();
 
         System.out.println("WAYPOINTS");
         for (int i = 0; i < world.getWaypoints().length; i++) {
@@ -399,6 +419,28 @@ public final class MyStrategy implements Strategy {
         }
         firstTick = false;
 
+        switch(world.getMapName()){
+            case "map01":
+            case "map02":
+            case "map03":
+                mapCoef11=-0.000083;
+                mapCoef12=0.011428571;
+                break;
+            case "map04":
+                mapCoef12=0.05;//ПРОВЕРИТЬ TODO
+                nitroUseDistance=7;
+                break;
+            case "map07":
+                mapCoef21 = -0.000023;
+                mapCoef22 = 0.02;
+                mapCoef12=0.05;
+                break;
+            case "map10":
+//                useNewTactic=false;
+                break;
+
+
+        }
 
     }
 
@@ -430,11 +472,18 @@ public final class MyStrategy implements Strategy {
                 for (; i < world.getWaypoints().length; i++) {
                     int curWpX=world.getWaypoints()[i][0];
                     int curWpY=world.getWaypoints()[i][1];
-
-                    if (Math.abs(curWpY-curY) > 0){
-                        straightTilesCounter = Math.abs(prevWpX-curX);
-                        path = myMap.findPath(curX, curY, prevWpX, prevWpY);
-                        break;
+                    if(useNewTactic) {
+                        if (Math.abs(curWpY - curY) > 0) {
+                            straightTilesCounter = Math.abs(prevWpX - curX);
+                            path = myMap.findPath(curX, curY, prevWpX, prevWpY);
+                            break;
+                        }
+                    }else{
+                        if (Math.abs(curWpY - curY) > 0) {
+                            straightTilesCounter = Math.abs(curWpX - curX);
+                            path = myMap.findPath(curX, curY, curWpX, curWpY);
+                            break;
+                        }
                     }
                     prevWpX=curWpX;
                     prevWpY=curWpY;
@@ -443,11 +492,18 @@ public final class MyStrategy implements Strategy {
                 for (; i < world.getWaypoints().length; i++) {
                     int curWpX=world.getWaypoints()[i][0];
                     int curWpY=world.getWaypoints()[i][1];
-
-                    if (Math.abs(curWpX-curX) > 0){
-                        straightTilesCounter = Math.abs(prevWpY-curY);
-                        path = myMap.findPath(curX, curY, prevWpX, prevWpY);
-                        break;
+                    if(useNewTactic) {
+                        if (Math.abs(curWpX - curX) > 0) {
+                            straightTilesCounter = Math.abs(prevWpY - curY);
+                            path = myMap.findPath(curX, curY, prevWpX, prevWpY);
+                            break;
+                        }
+                    }else {
+                        if (Math.abs(curWpX - curX) > 0) {
+                            straightTilesCounter = Math.abs(curWpY - curY);
+                            path = myMap.findPath(curX, curY, curWpX, curWpY);
+                            break;
+                        }
                     }
                     prevWpX=curWpX;
                     prevWpY=curWpY;
@@ -455,9 +511,9 @@ public final class MyStrategy implements Strategy {
 
             }
         }
-        if(world.getTick()>1300){
-            System.out.println("test");
-        }
+//        if(world.getTick()>1300){
+//            System.out.println("test");
+//        }
     }
 
     public boolean isWayToNextCheckpointStraight(Car self, World world, Game game, Move move) {
@@ -532,34 +588,55 @@ public final class MyStrategy implements Strategy {
         for (int j = 0; j < world.getHeight(); j++) {
             for (int i = 0; i < world.getWidth(); i++) {
                 TileType type = world.getTilesXY()[i][j];
-                switch (type){
+                switch (type) {
                     case EMPTY:
-                        myMap.getNode(i,j).setWalkable(false);
+                        myMap.getNode(i, j).setWalkable(false);
                         break;
                     case CROSSROADS:
                     case VERTICAL:
                     case HORIZONTAL:
-                        myMap.getNode(i,j).sethCosts(1);
+                        myMap.getNode(i, j).sethCosts(1);
                         break;
                     case TOP_HEADED_T:
                     case BOTTOM_HEADED_T:
                     case RIGHT_HEADED_T:
                     case LEFT_HEADED_T:
-                        myMap.getNode(i,j).sethCosts(5);
+                        myMap.getNode(i, j).sethCosts(5);
                         break;
                     case UNKNOWN:
-                        myMap.getNode(i,j).setWalkable(false);
-                        definedMap=false;
+                        myMap.getNode(i, j).setWalkable(false);
+                        definedMap = false;
                         System.out.println("Мир неопределён");
                         return;
 
                 }
             }
         }
+        //Подгон
+        switch (world.getMapName()) {
+            case "map06":
+                myMap.getNode(3, 13).setWalkable(false);
+                myMap.getNode(7, 14).setWalkable(false);
+                myMap.getNode(8, 14).setWalkable(false);
+                myMap.getNode(9, 14).setWalkable(false);
+                myMap.getNode(10, 14).setWalkable(false);
+                myMap.getNode(11, 14).setWalkable(false);
+                myMap.getNode(12, 14).setWalkable(false);
+                myMap.getNode(13, 14).setWalkable(false);
+                myMap.getNode(14, 13).setWalkable(false);
+                myMap.getNode(14, 14).setWalkable(false);
+                break;
+            case "map09":
+                myMap.getNode(1, 2).setWalkable(false);
+                myMap.getNode(1, 3).setWalkable(false);
+                myMap.getNode(1, 4).setWalkable(false);
+                myMap.getNode(1, 5).setWalkable(false);
+                myMap.getNode(1, 6).setWalkable(false);
+                myMap.getNode(1, 7).setWalkable(false);
+                break;
+        }
 
     }
-
-
 }
 
 
