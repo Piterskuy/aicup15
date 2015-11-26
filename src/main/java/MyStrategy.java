@@ -12,6 +12,11 @@ public final class MyStrategy implements Strategy {
     private static double prevGetX = -1.0;
     private static double prevGetY = -1.0;
 
+    //Доделать, берём координаты пред.тайла, чтобы не ехать назад.
+    //Или использовать Directional алгоритм
+    private static int prevTileX = -1;
+    private static int prevTileY = -1;
+
     private static boolean isStart = false;           //Гонка началась
 
     private static final int ticksStuckIni = 15;      //Количество тиков за которые если координаты не меняются - машина застряла
@@ -43,13 +48,20 @@ public final class MyStrategy implements Strategy {
     private static double mapCoef21 = -0.000083;
     private static double mapCoef22 = 0.005;
 
+    private static double coefCornerTileOfset = 0.3D;
     //TODO разворот на map03 не идеален (предыдущая версия лучше проходила)
     //TODO разворот на map04 ударения в змейку не идеальны (предыдущая версия лучше проходила), немного сгладил коэффициентами
     //TODO map05 подгон не нужен но в целом хуже (на 200 тиков)
     //map06, 07 отлично
     //map08 = 5968 тиков сравнить (не идеальный проход)
     //map09 - подкрутить коэффициенты поворотов а так ОК!
-    //TODO map10 TEST!!!
+    //map10, map11, map15 хорошо стало
+    //TODO map12 так и осталась непройденной
+    //TODO map13 стал хоть как-то проходить но по-прежнему плохо
+    //TODO map14 застревает в верхнем правом тайле, но пойдёт, считает что оптимальным является путь назад
+    //TODO map _fdoke не изменилось (нужно дорабатывать чутка)
+    //TODO map _tyamgin не доезжает до последнего WP 2:0
+    //TODO _ud1 проставить заград WALKABLE
     //Задание движения
     @Override
     public void move(Car self, World world, Game game, Move move) {
@@ -102,6 +114,7 @@ public final class MyStrategy implements Strategy {
 //ДОПИСАТЬ
 
 
+
         if(definedMap & (!isWayToNextCheckpointStraight(self, world, game, move) | straightTilesCounter < 2)){
             //Стратегия Astar
             int prevWpX = (int) (self.getX() / game.getTrackTileSize());
@@ -139,13 +152,13 @@ public final class MyStrategy implements Strategy {
         double speedModule = Math.abs(hypot(self.getSpeedX(), self.getSpeedY()));
 //        double cornerTileOffset = 0.3D * game.getTrackTileSize();
         double cornerTileOffset;
-        double coefLongWay=straightTilesCounter>3?0.4:straightTilesCounter/7;
+        double coefLongWay=straightTilesCounter>3?0.4:straightTilesCounter/7;//map10
         if (self.getRemainingNitroTicks() > 0 | speedModule>25) {
             cornerTileOffset = (0.6D-coefLongWay) * game.getTrackTileSize();//Чем меньше, тем дальше точка входа//0.4
             nextWaypointX = ( nextX + 0.45D) * game.getTrackTileSize();//0.5
             nextWaypointY = ( nextY + 0.45D) * game.getTrackTileSize();
         } else {
-            cornerTileOffset = (0.3D-coefLongWay) * game.getTrackTileSize();
+            cornerTileOffset = (coefCornerTileOfset-coefLongWay) * game.getTrackTileSize();
             nextWaypointX = ( nextX + 0.45D) * game.getTrackTileSize();//0.52
             nextWaypointY = ( nextY + 0.45D) * game.getTrackTileSize();
         }
@@ -408,41 +421,7 @@ public final class MyStrategy implements Strategy {
 
         }
     }
-    public static void calcParams(World world, Game game){
-//        nitroDistance=(int)game.getNitroEnginePowerFactor()*game.getNitroDurationTicks();
 
-        System.out.println("WAYPOINTS");
-        for (int i = 0; i < world.getWaypoints().length; i++) {
-            //[0] - X, [1] - Y
-            System.out.print("X: " + world.getWaypoints()[i][0]);
-            System.out.print(" Y: " + world.getWaypoints()[i][1] + "  |  ");
-        }
-        firstTick = false;
-
-        switch(world.getMapName()){
-            case "map01":
-            case "map02":
-            case "map03":
-                mapCoef11=-0.000083;
-                mapCoef12=0.011428571;
-                break;
-            case "map04":
-                mapCoef12=0.05;//ПРОВЕРИТЬ TODO
-                nitroUseDistance=7;
-                break;
-            case "map07":
-                mapCoef21 = -0.000023;
-                mapCoef22 = 0.02;
-                mapCoef12=0.05;
-                break;
-            case "map10":
-//                useNewTactic=false;
-                break;
-
-
-        }
-
-    }
 
     //Возвращает расстояние до ближайшего поворота
 
@@ -581,6 +560,64 @@ public final class MyStrategy implements Strategy {
         }
     }
 
+    public static void calcParams(World world, Game game){
+//        nitroDistance=(int)game.getNitroEnginePowerFactor()*game.getNitroDurationTicks();
+
+        System.out.println("WAYPOINTS");
+        for (int i = 0; i < world.getWaypoints().length; i++) {
+            //[0] - X, [1] - Y
+            System.out.print("X: " + world.getWaypoints()[i][0]);
+            System.out.print(" Y: " + world.getWaypoints()[i][1] + "  |  ");
+        }
+        firstTick = false;
+
+        switch(world.getMapName()){
+            case "map01":
+            case "map02":
+            case "map03":
+                mapCoef11=-0.000083;
+                mapCoef12=0.011428571;
+                break;
+            case "map04":
+                mapCoef12=0.05;//ПРОВЕРИТЬ TODO
+                nitroUseDistance=7;
+                break;
+            case "map07":
+                mapCoef21 = -0.000023;
+                mapCoef22 = 0.02;
+                mapCoef12=0.05;
+                break;
+//            case "map09":
+            case "map10":
+            case "map11":
+                mapCoef11=-0.0001;
+                mapCoef22 = 0.001;
+                nitroUseDistance=7;
+                coefCornerTileOfset=0.1D;
+                break;
+            case "map13":
+                Map.CANMOVEDIAGONALY=false;
+                mapCoef11=-0.000002;
+                mapCoef12 = 0.4;
+                mapCoef21=-0.00002;
+                mapCoef22 = 0.01;
+                nitroUseDistance=7;
+//                coefCornerTileOfset=0.1D;
+                break;
+            case "_tyamgin":
+//                mapCoef11=-0.000002;
+//                mapCoef12 = 0.4;
+                mapCoef21=-0.00002;
+                mapCoef22 = 0.04;
+                nitroUseDistance=17;
+                coefCornerTileOfset=0.1D;
+                break;
+
+
+        }
+
+    }
+
     public void makeMyWay(Car self, World world, Game game, Move move) {
         myMap = new Map<>(world.getWidth(), world.getHeight(), new ExampleFactory());
         path = new LinkedList<>();
@@ -634,11 +671,32 @@ public final class MyStrategy implements Strategy {
                 myMap.getNode(1, 6).setWalkable(false);
                 myMap.getNode(1, 7).setWalkable(false);
                 break;
+            case "map13":
+//                myMap.getNode(12, 6).setWalkable(false);
+//                myMap.getNode(12, 7).setWalkable(false);
+//                myMap.
+                break;
+            case "map14":
+//                myMap.getNode(11, 1).setWalkable(false);
+                break;
+            case "_tyamgin":
+                myMap.getNode(4, 4).setWalkable(false);
+                myMap.getNode(5, 4).setWalkable(false);
+                myMap.getNode(10, 4).setWalkable(false);
+                myMap.getNode(11, 4).setWalkable(false);
+                myMap.getNode(12, 4).setWalkable(false);
+                myMap.getNode(13, 4).setWalkable(false);
+                myMap.getNode(14, 4).setWalkable(false);
+                myMap.getNode(10, 1).setWalkable(false);
+                myMap.getNode(11, 1).setWalkable(false);
+                myMap.getNode(5, 1).setWalkable(false);
+                myMap.getNode(6, 1).setWalkable(false);
+
+                break;
         }
 
     }
 }
-
 
 
 
