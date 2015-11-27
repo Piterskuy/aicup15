@@ -595,9 +595,14 @@ public final class MyStrategy implements Strategy {
                 break;
             case "map01":
             case "map02":
-            case "map03":
                 mapCoef11=-0.000083;
                 mapCoef12=0.011428571;
+                break;
+            case "map03":
+                mapCoef11=-0.0000003;
+                mapCoef12=0.08;
+                coefTacticLongWaySet = true;
+                coefTacticLongWay = 0.3;
                 break;
             case "map04":
                 mapCoef12=0.05;//ПРОВЕРИТЬ TODO
