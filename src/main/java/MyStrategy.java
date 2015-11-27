@@ -19,11 +19,11 @@ public final class MyStrategy implements Strategy {
 
     private static boolean isStart = false;           //Гонка началась
 
-    private static final int ticksStuckIni = 15;      //Количество тиков за которые если координаты не меняются - машина застряла
+    private static int ticksStuckIni;      //Количество тиков за которые если координаты не меняются - машина застряла
     private static int ticksStuck = ticksStuckIni;   //Тиков до застревания
     private static boolean carStuck = false;          //Машина застряла
-    private static int ticksGetOutStuckIni = 90;      //Количество тиков за которые машина пытается выбраться
-    private static int ticksGetOutStuck = ticksGetOutStuckIni;      //Тиков до продолжения движения
+    private static int ticksGetOutStuckIni;      //Количество тиков за которые машина пытается выбраться
+    private static int ticksGetOutStuck;      //Тиков до продолжения движения
     private static boolean carGetOutStuckOperation = false;          //Операция по вызволению машины активирована
 
     private static double maxEngineValue = 1.0D;          //Максимальное значение двигателя
@@ -47,12 +47,22 @@ public final class MyStrategy implements Strategy {
     //Коэффициенты повороты руля за 1 тайл до WP
     private static double mapCoef21 = -0.000083;
     private static double mapCoef22 = 0.005;
-
+    private static int nitroCoolDownStartTics = 500;
     private static double coefCornerTileOfset = 0.3D;
+    private static double coefTacticLongWay = 0.4D;
+    private static boolean coefTacticLongWaySet = false;
+    //27.11
+    //Текущая
+    // 5 -отлично, 4 - не идеальны повороты, 3- в среднем ок, 2- проходит но плохо, 1-совсем не прошёл
+    //5 - 4
+    //4 - 1,2
+    //3 - 3
+    //2 -
+    //1 -
     //TODO разворот на map03 не идеален (предыдущая версия лучше проходила)
     //TODO разворот на map04 ударения в змейку не идеальны (предыдущая версия лучше проходила), немного сгладил коэффициентами
     //TODO map05 подгон не нужен но в целом хуже (на 200 тиков)
-    //map06, 07 отлично
+    //map01 map06, 07 отлично
     //map08 = 5968 тиков сравнить (не идеальный проход)
     //map09 - подкрутить коэффициенты поворотов а так ОК!
     //map10, map11, map15 хорошо стало
@@ -101,6 +111,9 @@ public final class MyStrategy implements Strategy {
         //Обновляем наше местоположение
         prevGetX = self.getX();
         prevGetY = self.getY();
+//        if(world.getTick()>180& world.getTick()%5==0){
+//            System.out.println(move.getEnginePower());
+//        }
     }
 
     //Устанавливаем следующий checkPoint
@@ -152,7 +165,9 @@ public final class MyStrategy implements Strategy {
         double speedModule = Math.abs(hypot(self.getSpeedX(), self.getSpeedY()));
 //        double cornerTileOffset = 0.3D * game.getTrackTileSize();
         double cornerTileOffset;
-        double coefLongWay=straightTilesCounter>3?0.4:straightTilesCounter/7;//map10
+
+        double coefLongWay=coefTacticLongWaySet?coefTacticLongWay:straightTilesCounter>3?0.4:straightTilesCounter/7;//map10
+
         if (self.getRemainingNitroTicks() > 0 | speedModule>25) {
             cornerTileOffset = (0.6D-coefLongWay) * game.getTrackTileSize();//Чем меньше, тем дальше точка входа//0.4
             nextWaypointX = ( nextX + 0.45D) * game.getTrackTileSize();//0.5
@@ -200,7 +215,7 @@ public final class MyStrategy implements Strategy {
                 maxEngineValue = 1.0D;
                 break;
             default:
-                maxEngineValue = 0.7D;
+                maxEngineValue = 0.9D;
         }
 
         //Перед поворотом сбавляем скорость
@@ -226,7 +241,7 @@ public final class MyStrategy implements Strategy {
         double speedModule = hypot(self.getSpeedX(), self.getSpeedY());
 
         //Если трасса сложная используем обновлённую тактику
-        if(useNewTactic) {
+//        if(useNewTactic) {
             if (oneTileBeforeTurn) {
                 double coef = mapCoef21*Math.pow(speedModule,3)+ mapCoef22*Math.pow(speedModule,2) + 0.02976*speedModule + 1;
                 move.setWheelTurn(angleToWaypoint * coef / PI);
@@ -235,9 +250,9 @@ public final class MyStrategy implements Strategy {
 
                 move.setWheelTurn(angleToWaypoint * coef / PI);
             }
-        }else{
-//            move.setWheelTurn(angleToWaypoint * 8.0D / PI);
-        }
+//        }else{
+////            move.setWheelTurn(angleToWaypoint * 8.0D / PI);
+//        }
         move.setEnginePower(maxEngineValue);
 
         double coefBrake = 5.5D * 5.5D * PI;
@@ -287,7 +302,7 @@ public final class MyStrategy implements Strategy {
     //Проверка на застревание
     public void isStuck(Car self, World world, Game game, Move move, double nextWaypointX, double nextWaypointY) {
         //Если гонка идёт и мы целы, а координаты не меняются уже ticksStuckIni тиков
-        if (isStart & self.getDurability() > 0) {
+        if (isStart & self.getDurability() > 0 & world.getTick()>250) {
 
             double dX = prevGetX - self.getX();
             double dY = prevGetY - self.getY();
@@ -359,7 +374,7 @@ public final class MyStrategy implements Strategy {
 
                 i = 0;
                 for (Car car : cars) {
-                    if(!car.isTeammate() & !car.isFinishedTrack()) {
+                    if(!car.isTeammate() & !car.isFinishedTrack() & car.getDurability()>0) {
                         double delta = 1;
                         if (Math.abs(carClosest[i] - self.getDistanceTo(car.getX(), car.getY())) <= delta) {
                             double angleToOpponent = self.getAngleTo(car);
@@ -381,7 +396,7 @@ public final class MyStrategy implements Strategy {
     public void useNitro(Car self, World world, Game game, Move move, double nextWaypoint[]) {
         if (isStart & self.getNitroChargeCount() > 0 & self.getRemainingNitroCooldownTicks() <= 0 && !move.isUseNitro()) {
 
-                if (straightTilesCounter>nitroUseDistance & world.getTick()>500 & self.getDurability()>0.5) {
+                if (straightTilesCounter>nitroUseDistance & world.getTick()>nitroCoolDownStartTics & self.getDurability()>0.5) {
 //            double distToTurn = distanceToTurn(self, world, game, move)*game.getTrackTileSize();
 //            if (distToTurn > nitroDistance*10) {
 
@@ -570,8 +585,14 @@ public final class MyStrategy implements Strategy {
             System.out.print(" Y: " + world.getWaypoints()[i][1] + "  |  ");
         }
         firstTick = false;
+        ticksStuckIni = 15;
+        ticksGetOutStuckIni = 90;
+        ticksGetOutStuck=ticksGetOutStuckIni;
 
         switch(world.getMapName()){
+            case "default":
+                nitroUseDistance=7;
+                break;
             case "map01":
             case "map02":
             case "map03":
@@ -582,10 +603,20 @@ public final class MyStrategy implements Strategy {
                 mapCoef12=0.05;//ПРОВЕРИТЬ TODO
                 nitroUseDistance=7;
                 break;
+            case "map06":
+                coefTacticLongWaySet = true;
+                coefTacticLongWay = 0.4;
+                nitroCoolDownStartTics = 800;
+                ticksGetOutStuckIni = 60;
+                break;
             case "map07":
                 mapCoef21 = -0.000023;
                 mapCoef22 = 0.02;
                 mapCoef12=0.05;
+                break;
+            case "map08":
+                nitroUseDistance=7;
+                ticksStuckIni = 20;
                 break;
 //            case "map09":
             case "map10":
@@ -593,7 +624,8 @@ public final class MyStrategy implements Strategy {
                 mapCoef11=-0.0001;
                 mapCoef22 = 0.001;
                 nitroUseDistance=7;
-                coefCornerTileOfset=0.1D;
+                coefTacticLongWaySet = true;
+                coefTacticLongWay = 0.2;
                 break;
             case "map13":
                 Map.CANMOVEDIAGONALY=false;
@@ -612,8 +644,9 @@ public final class MyStrategy implements Strategy {
                 nitroUseDistance=17;
                 coefCornerTileOfset=0.1D;
                 break;
-
-
+            case "_ud1":
+                mapCoef12 = 0.4;
+                break;
         }
 
     }
@@ -652,6 +685,9 @@ public final class MyStrategy implements Strategy {
         //Подгон
         switch (world.getMapName()) {
             case "map06":
+                myMap.getNode(3, 10).setWalkable(false);
+                myMap.getNode(3, 11).setWalkable(false);
+                myMap.getNode(3, 12).setWalkable(false);
                 myMap.getNode(3, 13).setWalkable(false);
                 myMap.getNode(7, 14).setWalkable(false);
                 myMap.getNode(8, 14).setWalkable(false);
@@ -676,9 +712,6 @@ public final class MyStrategy implements Strategy {
 //                myMap.getNode(12, 7).setWalkable(false);
 //                myMap.
                 break;
-            case "map14":
-//                myMap.getNode(11, 1).setWalkable(false);
-                break;
             case "_tyamgin":
                 myMap.getNode(4, 4).setWalkable(false);
                 myMap.getNode(5, 4).setWalkable(false);
@@ -691,6 +724,18 @@ public final class MyStrategy implements Strategy {
                 myMap.getNode(11, 1).setWalkable(false);
                 myMap.getNode(5, 1).setWalkable(false);
                 myMap.getNode(6, 1).setWalkable(false);
+
+                break;
+            case "_ud1":
+                myMap.getNode(6, 14).setWalkable(false);
+                myMap.getNode(7, 14).setWalkable(false);
+                myMap.getNode(8, 14).setWalkable(false);
+                myMap.getNode(9, 14).setWalkable(false);
+                myMap.getNode(10, 14).setWalkable(false);
+                myMap.getNode(5, 13).setWalkable(false);
+                myMap.getNode(6, 13).setWalkable(false);
+//                myMap.getNode(3, 11).setWalkable(false);
+//                myMap.getNode(2, 8).setWalkable(false);
 
                 break;
         }
